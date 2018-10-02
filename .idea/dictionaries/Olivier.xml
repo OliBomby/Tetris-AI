@@ -1,7 +1,27 @@
 <component name="ProjectDictionaryState">
   <dictionary name="Olivier">
     <words>
+      <w>bgcolor</w>
+      <w>boardheight</w>
+      <w>boardwidth</w>
+      <w>bordercolor</w>
+      <w>boxsize</w>
+      <w>lightblue</w>
+      <w>lightcolors</w>
+      <w>lightgreen</w>
+      <w>lightred</w>
+      <w>lightyellow</w>
+      <w>movedownfreq</w>
+      <w>movesidewaysfreq</w>
+      <w>templateheight</w>
+      <w>templatewidth</w>
       <w>tetromino</w>
+      <w>textcolor</w>
+      <w>textshadowcolor</w>
+      <w>topmargin</w>
+      <w>windowheight</w>
+      <w>windowwidth</w>
+      <w>xmargin</w>
     </words>
   </dictionary>
 </component>
