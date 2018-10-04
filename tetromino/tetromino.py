@@ -4,12 +4,11 @@
 # Released under a "Simplified BSD" license
 
 # TODO: 0.5s lock delay, pause after lock, pause from line, upcoming tetros,
-# TODO: wall kicks, official keybinds, hold, colour consistency,
+# TODO: wall kicks, official keybinds, hold,
 # TODO: sound fx, ghost piece, official lines and score, top out, lock out,
 # TODO: T-spin reward, 15 moves before lock, back to back chain, speed curve
 # TODO: Super rotation system, tetros start locations
 
-# DONE: bag randomizer, board size
 
 import random, time, pygame, sys
 from pygame.locals import *
@@ -38,19 +37,27 @@ GREEN = (0, 155, 0)
 LIGHTGREEN = (20, 175, 20)
 BLUE = (0, 0, 155)
 LIGHTBLUE = (20, 20, 175)
-YELLOW = (155, 155, 0)
-LIGHTYELLOW = (175, 175, 20)
+CYAN = (27, 226, 216)
+LIGHTCYAN = (28, 255, 243)
+YELLOW = (235, 230, 0)
+LIGHTYELLOW = (255, 250, 20)
+ORANGE = (234, 137, 82)
+LIGHTORANGE = (255, 140, 0)
+PURPLE = (136, 17, 173)
+LIGHTPURPLE = (160, 30, 200)
 
 BORDERCOLOR = BLUE
 BGCOLOR = BLACK
 TEXTCOLOR = WHITE
 TEXTSHADOWCOLOR = GRAY
-COLORS = (BLUE, GREEN, RED, YELLOW)
-LIGHTCOLORS = (LIGHTBLUE, LIGHTGREEN, LIGHTRED, LIGHTYELLOW)
+COLORS = (GREEN, RED, BLUE, ORANGE, CYAN, YELLOW, PURPLE)
+LIGHTCOLORS = (LIGHTGREEN, LIGHTRED, LIGHTBLUE, LIGHTORANGE, LIGHTCYAN, LIGHTYELLOW, LIGHTPURPLE)
 assert len(COLORS) == len(LIGHTCOLORS)  # each color must have light color
 
 TEMPLATEWIDTH = 5
 TEMPLATEHEIGHT = 5
+
+SHAPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z']
 
 S_SHAPE_TEMPLATE = [['.....',
                      '.....',
@@ -162,6 +169,22 @@ PIECES = {'S': S_SHAPE_TEMPLATE,
           'O': O_SHAPE_TEMPLATE,
           'T': T_SHAPE_TEMPLATE}
 
+PIECES_COLORS = {'S': 0,
+                 'Z': 1,
+                 'J': 2,
+                 'L': 3,
+                 'I': 4,
+                 'O': 5,
+                 'T': 6}
+
+PIECES_START_ROTATIONS = {'S': 0,
+                          'Z': 0,
+                          'J': 0,
+                          'L': 0,
+                          'I': 1,
+                          'O': 0,
+                          'T': 0}
+
 
 class Bag:
     def __init__(self):
@@ -170,14 +193,13 @@ class Bag:
     def newBag(self):
         self.bag = [n for n in range(0, len(PIECES.keys()))]
         random.shuffle(self.bag)
-        print(self.bag)
 
     def getPiece(self):
         if len(self.bag) == 0:
             self.newBag()
         index = random.choice(self.bag)
         self.bag.remove(index)
-        return list(PIECES.keys())[index]
+        return SHAPES[index]
 
 
 def main():
@@ -374,7 +396,7 @@ def showTextScreen(text):
 
 
 def checkForQuit():
-    for event in pygame.event.get(QUIT):  # get all the QUIT events
+    for _ in pygame.event.get(QUIT):  # get all the QUIT events
         terminate()  # terminate if any QUIT events are present
     for event in pygame.event.get(KEYUP):  # get all the KEYUP events
         if event.key == K_ESCAPE:
@@ -394,10 +416,10 @@ def getNewPiece():
     # return a random new piece in a random rotation and color
     shape = BAG.getPiece()
     newPiece = {'shape': shape,
-                'rotation': random.randint(0, len(PIECES[shape]) - 1),
+                'rotation': PIECES_START_ROTATIONS[shape],
                 'x': int(BOARDWIDTH / 2) - int(TEMPLATEWIDTH / 2),
                 'y': 16,  # start it above the board (i.e. 18 because board is 40 high)
-                'color': random.randint(0, len(COLORS) - 1)}
+                'color': PIECES_COLORS[shape]}
     return newPiece
 
 
