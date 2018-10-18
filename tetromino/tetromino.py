@@ -4,10 +4,10 @@
 # Released under a "Simplified BSD" license
 
 # TODO: 0.5s lock delay, pause after lock, pause from line, upcoming tetros,
-# TODO: wall kicks, official keybinds, hold,
+# TODO: official keybinds, hold,
 # TODO: sound fx, ghost piece, official lines and score, top out, lock out,
 # TODO: T-spin reward, 15 moves before lock, back to back chain, speed curve
-# TODO: Super rotation system, tetros start locations
+# important ones: hold, upcoming tetros and 0.5 lock delay
 
 
 import random, time, pygame, sys
@@ -54,112 +54,102 @@ COLORS = (GREEN, RED, BLUE, ORANGE, CYAN, YELLOW, PURPLE)
 LIGHTCOLORS = (LIGHTGREEN, LIGHTRED, LIGHTBLUE, LIGHTORANGE, LIGHTCYAN, LIGHTYELLOW, LIGHTPURPLE)
 assert len(COLORS) == len(LIGHTCOLORS)  # each color must have light color
 
-TEMPLATEWIDTH = 5
-TEMPLATEHEIGHT = 5
-
 SHAPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z']
 
-S_SHAPE_TEMPLATE = [['.....',
-                     '.....',
-                     '..OO.',
-                     '.OO..',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '..OO.',
-                     '...O.',
-                     '.....']]
+S_SHAPE_TEMPLATE = [['.OO',
+                     'OO.',
+                     '...'],
+                    ['.O.',
+                     '.OO',
+                     '..O'],
+                    ['...',
+                     '.OO',
+                     'OO.'],
+                    ['O..',
+                     'OO.',
+                     '.O.', ]]
 
-Z_SHAPE_TEMPLATE = [['.....',
-                     '.....',
-                     '.OO..',
-                     '..OO.',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '.OO..',
-                     '.O...',
-                     '.....']]
+Z_SHAPE_TEMPLATE = [['OO.',
+                     '.OO',
+                     '...'],
+                    ['..O',
+                     '.OO',
+                     '.O.'],
+                    ['...',
+                     'OO.',
+                     '.OO'],
+                    ['.O.',
+                     'OO.',
+                     'O..']]
 
-I_SHAPE_TEMPLATE = [['..O..',
-                     '..O..',
-                     '..O..',
-                     '..O..',
-                     '.....'],
-                    ['.....',
-                     '.....',
-                     'OOOO.',
-                     '.....',
-                     '.....']]
+I_SHAPE_TEMPLATE = [['....',
+                     'OOOO',
+                     '....',
+                     '....'],
+                    ['..O.',
+                     '..O.',
+                     '..O.',
+                     '..O.'],
+                    ['....',
+                     '....',
+                     'OOOO',
+                     '....'],
+                    ['.O..',
+                     '.O..',
+                     '.O..',
+                     '.O..']]
 
-O_SHAPE_TEMPLATE = [['.....',
-                     '.....',
-                     '.OO..',
-                     '.OO..',
-                     '.....']]
+O_SHAPE_TEMPLATE = [['.OO.',
+                     '.OO.',
+                     '....'],
+                    ['.OO.',
+                     '.OO.',
+                     '....'],
+                    ['.OO.',
+                     '.OO.',
+                     '....'],
+                    ['.OO.',
+                     '.OO.',
+                     '....']]
 
-J_SHAPE_TEMPLATE = [['.....',
-                     '.O...',
-                     '.OOO.',
-                     '.....',
-                     '.....'],
-                    ['.....',
-                     '..OO.',
-                     '..O..',
-                     '..O..',
-                     '.....'],
-                    ['.....',
-                     '.....',
-                     '.OOO.',
-                     '...O.',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '..O..',
-                     '.OO..',
-                     '.....']]
+J_SHAPE_TEMPLATE = [['O..',
+                     'OOO',
+                     '...'],
+                    ['.OO',
+                     '.O.',
+                     '.O.'],
+                    ['OOO',
+                     '..O',
+                     '...'],
+                    ['.O.',
+                     '.O.',
+                     'OO.']]
 
-L_SHAPE_TEMPLATE = [['.....',
-                     '...O.',
-                     '.OOO.',
-                     '.....',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '..O..',
-                     '..OO.',
-                     '.....'],
-                    ['.....',
-                     '.....',
-                     '.OOO.',
-                     '.O...',
-                     '.....'],
-                    ['.....',
-                     '.OO..',
-                     '..O..',
-                     '..O..',
-                     '.....']]
+L_SHAPE_TEMPLATE = [['..O',
+                     'OOO',
+                     '...'],
+                    ['.O.',
+                     '.O.',
+                     '.OO'],
+                    ['...',
+                     'OOO',
+                     'O..'],
+                    ['OO.',
+                     '.O.',
+                     '.O.']]
 
-T_SHAPE_TEMPLATE = [['.....',
-                     '..O..',
-                     '.OOO.',
-                     '.....',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '..OO.',
-                     '..O..',
-                     '.....'],
-                    ['.....',
-                     '.....',
-                     '.OOO.',
-                     '..O..',
-                     '.....'],
-                    ['.....',
-                     '..O..',
-                     '.OO..',
-                     '..O..',
-                     '.....']]
+T_SHAPE_TEMPLATE = [['.O.',
+                     'OOO',
+                     '...'],
+                    ['.O.',
+                     '.OO',
+                     '.O.'],
+                    ['...',
+                     'OOO',
+                     '.O.'],
+                    ['.O.',
+                     'OO.',
+                     '.O.']]
 
 PIECES = {'S': S_SHAPE_TEMPLATE,
           'Z': Z_SHAPE_TEMPLATE,
@@ -181,9 +171,35 @@ PIECES_START_ROTATIONS = {'S': 0,
                           'Z': 0,
                           'J': 0,
                           'L': 0,
-                          'I': 1,
+                          'I': 0,
                           'O': 0,
                           'T': 0}
+
+PIECES_START_X = {'S': 3,
+                  'Z': 3,
+                  'J': 3,
+                  'L': 3,
+                  'I': 3,
+                  'O': 3,
+                  'T': 3}
+
+WALL_KICK_DATA = {'01': [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+                  '10': [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+                  '12': [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+                  '21': [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+                  '23': [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+                  '32': [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+                  '30': [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+                  '03': [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)]}
+
+WALL_KICK_DATA_I = {'01': [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+                    '10': [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+                    '12': [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+                    '21': [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+                    '23': [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+                    '32': [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+                    '30': [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+                    '03': [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]}
 
 
 class Bag:
@@ -285,13 +301,9 @@ def runGame():
 
                 # rotating the piece (if there is room to rotate)
                 elif event.key == K_UP or event.key == K_w:
-                    fallingPiece['rotation'] = (fallingPiece['rotation'] + 1) % len(PIECES[fallingPiece['shape']])
-                    if not isValidPosition(board, fallingPiece):
-                        fallingPiece['rotation'] = (fallingPiece['rotation'] - 1) % len(PIECES[fallingPiece['shape']])
+                    rotatePiece(fallingPiece, 1, board)
                 elif event.key == K_q:  # rotate the other direction
-                    fallingPiece['rotation'] = (fallingPiece['rotation'] - 1) % len(PIECES[fallingPiece['shape']])
-                    if not isValidPosition(board, fallingPiece):
-                        fallingPiece['rotation'] = (fallingPiece['rotation'] + 1) % len(PIECES[fallingPiece['shape']])
+                    rotatePiece(fallingPiece, -1, board)
 
                 # making the piece fall faster with the down key
                 elif event.key == K_DOWN or event.key == K_s:
@@ -348,6 +360,35 @@ def runGame():
 
         pygame.display.update()
         FPSCLOCK.tick(FPS)
+
+
+def rotatePiece(piece, rotation, board):
+    initialRotation = piece['rotation']
+    desiredRotation = (piece['rotation'] + rotation) % len(PIECES[piece['shape']])
+    if piece['shape'] == 'I':
+        for x, y in WALL_KICK_DATA_I[str(initialRotation) + str(desiredRotation)]:
+            piece['rotation'] = desiredRotation
+            piece['x'] = piece['x'] + x
+            piece['y'] = piece['y'] + y
+            if isValidPosition(board, piece):
+                break
+            else:
+                piece['rotation'] = initialRotation
+                piece['x'] = piece['x'] - x
+                piece['y'] = piece['y'] - y
+    elif piece['shape'] == 'O':
+        pass
+    else:
+        for x, y in WALL_KICK_DATA[str(initialRotation) + str(desiredRotation)]:
+            piece['rotation'] = desiredRotation
+            piece['x'] = piece['x'] + x
+            piece['y'] = piece['y'] + y
+            if isValidPosition(board, piece):
+                break
+            else:
+                piece['rotation'] = initialRotation
+                piece['x'] = piece['x'] - x
+                piece['y'] = piece['y'] - y
 
 
 def makeTextObjs(text, font, draw_color):
@@ -417,16 +458,16 @@ def getNewPiece():
     shape = BAG.getPiece()
     newPiece = {'shape': shape,
                 'rotation': PIECES_START_ROTATIONS[shape],
-                'x': int(BOARDWIDTH / 2) - int(TEMPLATEWIDTH / 2),
-                'y': 16,  # start it above the board (i.e. 18 because board is 40 high)
+                'x': PIECES_START_X[shape],
+                'y': 18,  # start it above the board (i.e. 18 because board is 40 high)
                 'color': PIECES_COLORS[shape]}
     return newPiece
 
 
 def addToBoard(board, piece):
     # fill in the board based on piece's location, shape, and rotation
-    for x in range(TEMPLATEWIDTH):
-        for y in range(TEMPLATEHEIGHT):
+    for x in range(getWidth(piece)):
+        for y in range(getHeight(piece)):
             if PIECES[piece['shape']][piece['rotation']][y][x] != BLANK:
                 board[x + piece['x']][y + piece['y']] = piece['color']
 
@@ -445,8 +486,8 @@ def isOnBoard(x, y):
 
 def isValidPosition(board, piece, adjX=0, adjY=0):
     # Return True if the piece is within the board and not colliding
-    for x in range(TEMPLATEWIDTH):
-        for y in range(TEMPLATEHEIGHT):
+    for x in range(getWidth(piece)):
+        for y in range(getHeight(piece)):
             isAboveBoard = y + piece['y'] + adjY < 0
             if isAboveBoard or PIECES[piece['shape']][piece['rotation']][y][x] == BLANK:
                 continue
@@ -537,6 +578,14 @@ def drawStatus(score, level):
     DISPLAYSURF.blit(levelSurf, levelRect)
 
 
+def getWidth(piece):
+    return len(PIECES[piece['shape']][0][0])
+
+
+def getHeight(piece):
+    return len(PIECES[piece['shape']][0])
+
+
 def drawPiece(piece, pixelx=None, pixely=None):
     shapeToDraw = PIECES[piece['shape']][piece['rotation']]
     if pixelx is None and pixely is None:
@@ -544,8 +593,8 @@ def drawPiece(piece, pixelx=None, pixely=None):
         pixelx, pixely = convertToPixelCoords(piece['x'], piece['y'])
 
     # draw each of the boxes that make up the piece
-    for x in range(TEMPLATEWIDTH):
-        for y in range(TEMPLATEHEIGHT):
+    for x in range(getWidth(piece)):
+        for y in range(getHeight(piece)):
             if shapeToDraw[y][x] != BLANK:
                 drawBox(None, None, piece['color'], pixelx + (x * BOXSIZE), pixely + (y * BOXSIZE))
 
