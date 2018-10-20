@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="BookmarkManager">
-    <bookmark url="file://$PROJECT_DIR$/tetromino/tetromino.py" line="192" />
+    <bookmark url="file://$PROJECT_DIR$/tetromino/tetromino.py" line="176" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="97d38e04-d408-4531-aaf8-241d814b6301" name="Default Changelist" comment="">
@@ -18,26 +18,27 @@
     <session id="-1032805512">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.closed" value="13" />
+          <entry key="project.closed" value="14" />
           <entry key="project.open.time.0" value="2" />
           <entry key="project.open.time.16" value="1" />
           <entry key="project.open.time.6" value="1" />
           <entry key="project.open.time.7" value="3" />
           <entry key="project.open.time.8" value="6" />
-          <entry key="project.opened" value="13" />
+          <entry key="project.open.time.9" value="1" />
+          <entry key="project.opened" value="14" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="Python Console" value="101" />
-          <entry key="py" value="3369" />
+          <entry key="py" value="4392" />
           <entry key="txt" value="82" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="PLAIN_TEXT" value="82" />
-          <entry key="Python" value="3470" />
+          <entry key="Python" value="4493" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
@@ -59,13 +60,13 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tetromino/tetromino.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="153">
-              <caret line="9" column="58" selection-start-line="9" selection-start-column="58" selection-end-line="9" selection-end-column="58" />
+            <state relative-caret-position="374">
+              <caret line="23" column="23" lean-forward="true" selection-start-line="23" selection-start-column="23" selection-end-line="23" selection-end-column="23" />
               <folding>
-                <marker date="1539896155598" expanded="true" signature="6086:6434" ph="..." />
-                <marker date="1539896155598" expanded="true" signature="12370:13453" ph="..." />
-                <marker date="1539896155598" expanded="true" signature="19805:19808" ph="..." />
-                <marker date="1539896155598" expanded="true" signature="20380:20425" ph="..." />
+                <marker date="1540062907900" expanded="true" signature="5646:5994" ph="..." />
+                <marker date="1540062907900" expanded="true" signature="13601:14704" ph="..." />
+                <marker date="1540062907900" expanded="true" signature="21008:21011" ph="..." />
+                <marker date="1540062907900" expanded="true" signature="21583:21628" ph="..." />
               </folding>
             </state>
           </provider>
@@ -87,8 +88,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1912" />
-    <option name="y" value="-7" />
+    <option name="x" value="-8" />
+    <option name="y" value="-8" />
     <option name="width" value="1936" />
     <option name="height" value="1056" />
   </component>
@@ -298,7 +299,8 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="1912" y="-7" width="1936" height="1056" extended-state="6" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.17017913" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -306,7 +308,7 @@
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.18329719" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.3991323" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.12689805" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.329718" />
@@ -370,13 +372,13 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/tetromino/tetromino.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="153">
-          <caret line="9" column="58" selection-start-line="9" selection-start-column="58" selection-end-line="9" selection-end-column="58" />
+        <state relative-caret-position="374">
+          <caret line="23" column="23" lean-forward="true" selection-start-line="23" selection-start-column="23" selection-end-line="23" selection-end-column="23" />
           <folding>
-            <marker date="1539896155598" expanded="true" signature="6086:6434" ph="..." />
-            <marker date="1539896155598" expanded="true" signature="12370:13453" ph="..." />
-            <marker date="1539896155598" expanded="true" signature="19805:19808" ph="..." />
-            <marker date="1539896155598" expanded="true" signature="20380:20425" ph="..." />
+            <marker date="1540062907900" expanded="true" signature="5646:5994" ph="..." />
+            <marker date="1540062907900" expanded="true" signature="13601:14704" ph="..." />
+            <marker date="1540062907900" expanded="true" signature="21008:21011" ph="..." />
+            <marker date="1540062907900" expanded="true" signature="21583:21628" ph="..." />
           </folding>
         </state>
       </provider>

@@ -1,13 +1,13 @@
 # Tetromino (a Tetris clone)
 # By Al Sweigart al@inventwithpython.com
+# Improved by Olivier Schipper
 # http://inventwithpython.com/pygame
 # Released under a "Simplified BSD" license
 
-# TODO: 0.5s lock delay, pause after lock, pause from line, upcoming tetros,
-# TODO: official keybinds, hold,
-# TODO: sound fx, ghost piece, official lines and score, top out, lock out,
-# TODO: T-spin reward, 15 moves before lock, back to back chain, speed curve
-# important ones: hold, upcoming tetros and 0.5 lock delay
+# TODO: pause after lock, pause from line, upcoming tetros,
+# TODO: sound fx, ghost piece, official lines and score,
+# TODO: T-spin reward, back to back chain, speed curve
+# important ones: upcoming tetros, speed curve, ghost piece, official lines and score
 
 
 import random, time, pygame, sys
@@ -167,22 +167,6 @@ PIECES_COLORS = {'S': 0,
                  'O': 5,
                  'T': 6}
 
-PIECES_START_ROTATIONS = {'S': 0,
-                          'Z': 0,
-                          'J': 0,
-                          'L': 0,
-                          'I': 0,
-                          'O': 0,
-                          'T': 0}
-
-PIECES_START_X = {'S': 3,
-                  'Z': 3,
-                  'J': 3,
-                  'L': 3,
-                  'I': 3,
-                  'O': 3,
-                  'T': 3}
-
 WALL_KICK_DATA = {'01': [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
                   '10': [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
                   '12': [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
@@ -201,6 +185,7 @@ WALL_KICK_DATA_I = {'01': [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
                     '30': [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
                     '03': [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]}
 
+LOCKTIME = 0.5
 
 class Bag:
     def __init__(self):
@@ -246,22 +231,30 @@ def runGame():
     BAG.newBag()
     lastMoveDownTime = time.time()
     lastMoveSidewaysTime = time.time()
-    lastFallTime = time.time()
+    lastFallTime = 0
     movingDown = False  # note: there is no movingUp variable
     movingLeft = False
     movingRight = False
+    canUseHold = True
+    lastTime = time.time()
+    lockTime = LOCKTIME
     score = 0
+    moves = 0
     level, fallFreq = calculateLevelAndFallFreq(score)
 
     fallingPiece = getNewPiece()
     nextPiece = getNewPiece()
+    holdPiece = None
 
     while True:  # game loop
         if fallingPiece is None:
             # No falling piece in play, so start a new piece at the top
             fallingPiece = nextPiece
             nextPiece = getNewPiece()
-            lastFallTime = time.time()  # reset lastFallTime
+            lastFallTime = 0  # reset lastFallTime
+            lockTime = LOCKTIME
+            moves = 0
+            canUseHold = True
 
             if not isValidPosition(board, fallingPiece):
                 return  # can't fit a new piece on the board, so game over
@@ -269,7 +262,7 @@ def runGame():
         checkForQuit()
         for event in pygame.event.get():  # event handling loop
             if event.type == KEYUP:
-                if event.key == K_p:
+                if event.key == K_ESCAPE:
                     # Pausing the game
                     DISPLAYSURF.fill(BGCOLOR)
                     pygame.mixer.music.stop()
@@ -292,18 +285,28 @@ def runGame():
                     movingLeft = True
                     movingRight = False
                     lastMoveSidewaysTime = time.time()
+                    if not lockTime == LOCKTIME and moves < 16:
+                        lockTime = LOCKTIME
+                        moves += 1
 
                 elif (event.key == K_RIGHT or event.key == K_d) and isValidPosition(board, fallingPiece, adjX=1):
                     fallingPiece['x'] += 1
                     movingRight = True
                     movingLeft = False
                     lastMoveSidewaysTime = time.time()
+                    if not lockTime == LOCKTIME and moves < 16:
+                        lockTime = LOCKTIME
+                        moves += 1
 
                 # rotating the piece (if there is room to rotate)
-                elif event.key == K_UP or event.key == K_w:
-                    rotatePiece(fallingPiece, 1, board)
-                elif event.key == K_q:  # rotate the other direction
-                    rotatePiece(fallingPiece, -1, board)
+                elif event.key == K_UP or event.key == K_x:
+                    if rotatePiece(fallingPiece, 1, board) and not lockTime == LOCKTIME and moves < 16:
+                        lockTime = LOCKTIME
+                        moves += 1
+                elif event.key == K_z:  # rotate the other direction
+                    if rotatePiece(fallingPiece, -1, board) and not lockTime == LOCKTIME and moves < 16:
+                        lockTime = LOCKTIME
+                        moves += 1
 
                 # making the piece fall faster with the down key
                 elif event.key == K_DOWN or event.key == K_s:
@@ -317,10 +320,30 @@ def runGame():
                     movingDown = False
                     movingLeft = False
                     movingRight = False
+                    lockTime = -1
                     for i in range(1, BOARDHEIGHT):
                         if not isValidPosition(board, fallingPiece, adjY=i):
                             fallingPiece['y'] += i - 1
                             break
+
+                # hold piece
+                elif (event.key == K_c) and canUseHold:
+                    # swap hold and falling piece
+                    oldHoldPiece = holdPiece
+                    holdPiece = fallingPiece
+                    fallingPiece = oldHoldPiece
+                    if fallingPiece is None:
+                        fallingPiece = nextPiece
+                        nextPiece = getNewPiece()
+
+                    lastFallTime = 0  # reset lastFallTime
+                    lockTime = LOCKTIME
+                    moves = 0
+
+                    holdPiece['rotation'] = 0
+                    holdPiece['x'] = 3
+                    holdPiece['y'] = 18
+                    canUseHold = False
 
         # handle moving the piece because of user input
         if (movingLeft or movingRight) and time.time() - lastMoveSidewaysTime > MOVESIDEWAYSFREQ:
@@ -335,24 +358,31 @@ def runGame():
             fallingPiece['y'] += 1
             lastMoveDownTime = time.time()
 
-        # let the piece fall if it is time to fall
-        if time.time() - lastFallTime > fallFreq:
-            # see if the piece has landed
-            if not isValidPosition(board, fallingPiece, adjY=1):
-                # falling piece has landed, set it on the board
+        if not isValidPosition(board, fallingPiece, adjY=1):
+            lastFallTime = time.time()
+            lockTime -= time.time() - lastTime
+            if lockTime < 0:
+                if fallingPiece['y'] > 17:
+                    return  # lock out: a piece locked in above the screen
                 addToBoard(board, fallingPiece)
                 score += removeCompleteLines(board)
                 level, fallFreq = calculateLevelAndFallFreq(score)
                 fallingPiece = None
-            else:
-                # piece did not land, just move the piece down
+
+        lastTime = time.time()
+
+        # let the piece fall if it is time to fall
+        if time.time() - lastFallTime > fallFreq:
+            lastFallTime = time.time()
+            # see if the piece has landed
+            if isValidPosition(board, fallingPiece, adjY=1):
                 fallingPiece['y'] += 1
-                lastFallTime = time.time()
 
         # drawing everything on the screen
         DISPLAYSURF.fill(BGCOLOR)
         drawStatus(score, level)
         drawNextPiece(nextPiece)
+        drawHoldPiece(holdPiece)
         if fallingPiece is not None:
             drawPiece(fallingPiece)
         drawBoard(board)
@@ -369,26 +399,26 @@ def rotatePiece(piece, rotation, board):
         for x, y in WALL_KICK_DATA_I[str(initialRotation) + str(desiredRotation)]:
             piece['rotation'] = desiredRotation
             piece['x'] = piece['x'] + x
-            piece['y'] = piece['y'] + y
+            piece['y'] = piece['y'] - y
             if isValidPosition(board, piece):
-                break
+                return True
             else:
                 piece['rotation'] = initialRotation
                 piece['x'] = piece['x'] - x
-                piece['y'] = piece['y'] - y
+                piece['y'] = piece['y'] + y
     elif piece['shape'] == 'O':
-        pass
+        return False
     else:
         for x, y in WALL_KICK_DATA[str(initialRotation) + str(desiredRotation)]:
             piece['rotation'] = desiredRotation
             piece['x'] = piece['x'] + x
-            piece['y'] = piece['y'] + y
+            piece['y'] = piece['y'] - y
             if isValidPosition(board, piece):
-                break
+                return True
             else:
                 piece['rotation'] = initialRotation
                 piece['x'] = piece['x'] - x
-                piece['y'] = piece['y'] - y
+                piece['y'] = piece['y'] + y
 
 
 def makeTextObjs(text, font, draw_color):
@@ -457,8 +487,8 @@ def getNewPiece():
     # return a random new piece in a random rotation and color
     shape = BAG.getPiece()
     newPiece = {'shape': shape,
-                'rotation': PIECES_START_ROTATIONS[shape],
-                'x': PIECES_START_X[shape],
+                'rotation': 0,
+                'x': 3,
                 'y': 18,  # start it above the board (i.e. 18 because board is 40 high)
                 'color': PIECES_COLORS[shape]}
     return newPiece
@@ -607,6 +637,17 @@ def drawNextPiece(piece):
     DISPLAYSURF.blit(nextSurf, nextRect)
     # draw the "next" piece
     drawPiece(piece, pixelx=WINDOWWIDTH - 120, pixely=100)
+
+
+def drawHoldPiece(piece):
+    # draw the "hold" text
+    holdSurf = BASICFONT.render('Hold:', True, TEXTCOLOR)
+    holdRect = holdSurf.get_rect()
+    holdRect.topleft = (WINDOWWIDTH - 520, 80)
+    DISPLAYSURF.blit(holdSurf, holdRect)
+    # draw the "hold" piece
+    if piece is not None:
+        drawPiece(piece, pixelx=WINDOWWIDTH - 520, pixely=100)
 
 
 if __name__ == '__main__':
