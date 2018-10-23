@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="BookmarkManager">
-    <bookmark url="file://$PROJECT_DIR$/tetromino/tetromino.py" line="176" />
+    <bookmark url="file://$PROJECT_DIR$/tetromino/tetromino.py" line="178" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="97d38e04-d408-4531-aaf8-241d814b6301" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tetromino/tetromino.py" beforeDir="false" afterPath="$PROJECT_DIR$/tetromino/tetromino.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -18,27 +17,27 @@
     <session id="-1032805512">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.closed" value="14" />
+          <entry key="project.closed" value="15" />
           <entry key="project.open.time.0" value="2" />
           <entry key="project.open.time.16" value="1" />
-          <entry key="project.open.time.6" value="1" />
+          <entry key="project.open.time.6" value="2" />
           <entry key="project.open.time.7" value="3" />
           <entry key="project.open.time.8" value="6" />
           <entry key="project.open.time.9" value="1" />
-          <entry key="project.opened" value="14" />
+          <entry key="project.opened" value="15" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="Python Console" value="101" />
-          <entry key="py" value="4392" />
+          <entry key="py" value="4629" />
           <entry key="txt" value="82" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="PLAIN_TEXT" value="82" />
-          <entry key="Python" value="4493" />
+          <entry key="Python" value="4730" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
@@ -60,13 +59,13 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tetromino/tetromino.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="374">
-              <caret line="23" column="23" lean-forward="true" selection-start-line="23" selection-start-column="23" selection-end-line="23" selection-end-column="23" />
+            <state relative-caret-position="510">
+              <caret line="40" column="23" selection-start-line="40" selection-start-column="23" selection-end-line="40" selection-end-column="23" />
               <folding>
-                <marker date="1540062907900" expanded="true" signature="5646:5994" ph="..." />
-                <marker date="1540062907900" expanded="true" signature="13601:14704" ph="..." />
-                <marker date="1540062907900" expanded="true" signature="21008:21011" ph="..." />
-                <marker date="1540062907900" expanded="true" signature="21583:21628" ph="..." />
+                <marker date="1540326596609" expanded="true" signature="5647:5995" ph="..." />
+                <marker date="1540326596609" expanded="true" signature="13592:14695" ph="..." />
+                <marker date="1540326596609" expanded="true" signature="20999:21002" ph="..." />
+                <marker date="1540326596609" expanded="true" signature="21574:21619" ph="..." />
               </folding>
             </state>
           </provider>
@@ -119,6 +118,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -144,7 +144,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -372,13 +371,13 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/tetromino/tetromino.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="374">
-          <caret line="23" column="23" lean-forward="true" selection-start-line="23" selection-start-column="23" selection-end-line="23" selection-end-column="23" />
+        <state relative-caret-position="510">
+          <caret line="40" column="23" selection-start-line="40" selection-start-column="23" selection-end-line="40" selection-end-column="23" />
           <folding>
-            <marker date="1540062907900" expanded="true" signature="5646:5994" ph="..." />
-            <marker date="1540062907900" expanded="true" signature="13601:14704" ph="..." />
-            <marker date="1540062907900" expanded="true" signature="21008:21011" ph="..." />
-            <marker date="1540062907900" expanded="true" signature="21583:21628" ph="..." />
+            <marker date="1540326596609" expanded="true" signature="5647:5995" ph="..." />
+            <marker date="1540326596609" expanded="true" signature="13592:14695" ph="..." />
+            <marker date="1540326596609" expanded="true" signature="20999:21002" ph="..." />
+            <marker date="1540326596609" expanded="true" signature="21574:21619" ph="..." />
           </folding>
         </state>
       </provider>

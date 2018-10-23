@@ -7,7 +7,7 @@
 # TODO: pause after lock, pause from line, upcoming tetros,
 # TODO: sound fx, ghost piece, official lines and score,
 # TODO: T-spin reward, back to back chain, speed curve
-# important ones: upcoming tetros, speed curve, ghost piece, official lines and score
+# important ones: speed curve, ghost piece, official lines and score
 
 
 import random, time, pygame, sys
@@ -22,7 +22,9 @@ BOARDHEIGHT = 40
 BLANK = '.'
 
 MOVESIDEWAYSFREQ = 0.05
-MOVEDOWNFREQ = 0.1
+MOVEDOWNFREQ = 0.05
+NEXTPIECES = 6
+LOCKTIME = 0.5
 
 XMARGIN = int((WINDOWWIDTH - BOARDWIDTH * BOXSIZE) / 2)
 TOPMARGIN = WINDOWHEIGHT - (BOARDHEIGHT * BOXSIZE) - 5 + 400
@@ -35,8 +37,8 @@ RED = (155, 0, 0)
 LIGHTRED = (175, 20, 20)
 GREEN = (0, 155, 0)
 LIGHTGREEN = (20, 175, 20)
-BLUE = (0, 0, 155)
-LIGHTBLUE = (20, 20, 175)
+BLUE = (20, 20, 175)
+LIGHTBLUE = (40, 40, 195)
 CYAN = (27, 226, 216)
 LIGHTCYAN = (28, 255, 243)
 YELLOW = (235, 230, 0)
@@ -185,7 +187,6 @@ WALL_KICK_DATA_I = {'01': [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
                     '30': [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
                     '03': [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]}
 
-LOCKTIME = 0.5
 
 class Bag:
     def __init__(self):
@@ -243,14 +244,14 @@ def runGame():
     level, fallFreq = calculateLevelAndFallFreq(score)
 
     fallingPiece = getNewPiece()
-    nextPiece = getNewPiece()
+    nextPieces = [getNewPiece() for _ in range(NEXTPIECES)]
     holdPiece = None
 
     while True:  # game loop
         if fallingPiece is None:
             # No falling piece in play, so start a new piece at the top
-            fallingPiece = nextPiece
-            nextPiece = getNewPiece()
+            fallingPiece = nextPieces.pop(0)
+            nextPieces.append(getNewPiece())
             lastFallTime = 0  # reset lastFallTime
             lockTime = LOCKTIME
             moves = 0
@@ -333,8 +334,8 @@ def runGame():
                     holdPiece = fallingPiece
                     fallingPiece = oldHoldPiece
                     if fallingPiece is None:
-                        fallingPiece = nextPiece
-                        nextPiece = getNewPiece()
+                        fallingPiece = nextPieces.pop(0)
+                        nextPieces.append(getNewPiece())
 
                     lastFallTime = 0  # reset lastFallTime
                     lockTime = LOCKTIME
@@ -353,16 +354,16 @@ def runGame():
                 fallingPiece['x'] += 1
             lastMoveSidewaysTime = time.time()
 
-        if movingDown and time.time() - lastMoveDownTime > MOVEDOWNFREQ and isValidPosition(board, fallingPiece,
-                                                                                            adjY=1):
-            fallingPiece['y'] += 1
-            lastMoveDownTime = time.time()
+        if movingDown and time.time() - lastMoveDownTime > MOVEDOWNFREQ:
+            if isValidPosition(board, fallingPiece, adjY=1):
+                fallingPiece['y'] += 1
+                lastMoveDownTime = time.time()
 
         if not isValidPosition(board, fallingPiece, adjY=1):
             lastFallTime = time.time()
             lockTime -= time.time() - lastTime
             if lockTime < 0:
-                if fallingPiece['y'] > 17:
+                if fallingPiece['y'] < 19:
                     return  # lock out: a piece locked in above the screen
                 addToBoard(board, fallingPiece)
                 score += removeCompleteLines(board)
@@ -381,7 +382,7 @@ def runGame():
         # drawing everything on the screen
         DISPLAYSURF.fill(BGCOLOR)
         drawStatus(score, level)
-        drawNextPiece(nextPiece)
+        drawNextPieces(nextPieces)
         drawHoldPiece(holdPiece)
         if fallingPiece is not None:
             drawPiece(fallingPiece)
@@ -629,14 +630,15 @@ def drawPiece(piece, pixelx=None, pixely=None):
                 drawBox(None, None, piece['color'], pixelx + (x * BOXSIZE), pixely + (y * BOXSIZE))
 
 
-def drawNextPiece(piece):
+def drawNextPieces(pieces):
     # draw the "next" text
     nextSurf = BASICFONT.render('Next:', True, TEXTCOLOR)
     nextRect = nextSurf.get_rect()
     nextRect.topleft = (WINDOWWIDTH - 120, 80)
     DISPLAYSURF.blit(nextSurf, nextRect)
-    # draw the "next" piece
-    drawPiece(piece, pixelx=WINDOWWIDTH - 120, pixely=100)
+    # draw the "next" pieces
+    for i, p in enumerate(pieces):
+        drawPiece(p, pixelx=WINDOWWIDTH - 120, pixely=100 + 45 * i)
 
 
 def drawHoldPiece(piece):
