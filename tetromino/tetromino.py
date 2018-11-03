@@ -4,11 +4,6 @@
 # http://inventwithpython.com/pygame
 # Released under a "Simplified BSD" license
 
-# TODO: pause after lock, pause from line, upcoming tetros,
-# TODO: sound fx, ghost piece, official lines and score,
-# TODO: T-spin reward, back to back chain, speed curve
-# important ones: speed curve, ghost piece, official lines and score
-
 
 import random, time, pygame, sys
 from pygame.locals import *
@@ -19,12 +14,13 @@ WINDOWHEIGHT = 480
 BOXSIZE = 20
 BOARDWIDTH = 10
 BOARDHEIGHT = 40
+NEXTPIECES = 6
 BLANK = '.'
 
-MOVESIDEWAYSFREQ = 0.05
-MOVEDOWNFREQ = 0.05
-NEXTPIECES = 6
-LOCKTIME = 0.5
+MOVESIDEWAYSFREQ = 0.05 * FPS
+MOVESIDEWAYSDELAY = 0.2 * FPS
+MOVEDOWNFREQ = 0.05 * FPS
+LOCKTIME = 0.5 * FPS
 
 XMARGIN = int((WINDOWWIDTH - BOARDWIDTH * BOXSIZE) / 2)
 TOPMARGIN = WINDOWHEIGHT - (BOARDHEIGHT * BOXSIZE) - 5 + 400
@@ -153,6 +149,10 @@ T_SHAPE_TEMPLATE = [['.O.',
                      'OO.',
                      '.O.']]
 
+T_SPIN_CHECK_TEMPLATE = ['O.O',
+                         '...',
+                         'O.O']
+
 PIECES = {'S': S_SHAPE_TEMPLATE,
           'Z': Z_SHAPE_TEMPLATE,
           'J': J_SHAPE_TEMPLATE,
@@ -187,6 +187,47 @@ WALL_KICK_DATA_I = {'01': [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
                     '30': [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
                     '03': [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)]}
 
+SCORING_DATA = {'0': 0,
+                'B0': 0,
+                '1': 100,
+                'B1': 100,
+                'MT0': 100,
+                'MT1': 200,
+                'BMT1': 200,
+                '2': 300,
+                'B2': 300,
+                'T0': 400,
+                'BT0': 400,
+                '3': 500,
+                'B3': 500,
+                '4': 800,
+                'T1': 800,
+                'BMT0': 150,
+                'BT1': 1200,
+                'B4': 1200,
+                'T2': 1200,
+                'T3': 1600,
+                'BT2': 1800,
+                'BT3': 2400}
+
+LINE_CLEAR_DATA = {'0': 0,
+                   '1': 1,
+                   '2': 3,
+                   'T0': 1,
+                   '3': 5,
+                   '4': 8,
+                   'B4': 12,
+                   'T1': 3,
+                   'T2': 7,
+                   'T3': 6}
+
+pygame.mixer.pre_init(48000, 16, 2, 4096)
+pygame.init()
+EFFECT_MOVE = pygame.mixer.Sound('move.wav')
+EFFECT_ROTATE = pygame.mixer.Sound('rotate.wav')
+EFFECT_HOLD = pygame.mixer.Sound('hold.wav')
+EFFECT_LOCK = pygame.mixer.Sound('lock.wav')
+EFFECT_CLEAR = pygame.mixer.Sound('clear.wav')
 
 class Bag:
     def __init__(self):
@@ -228,20 +269,28 @@ def main():
 
 def runGame():
     # setup variables for the start of the game
+    frame = 0
     board = getBlankBoard()
     BAG.newBag()
-    lastMoveDownTime = time.time()
-    lastMoveSidewaysTime = time.time()
+    lastMoveDownTime = frame
+    lastMoveSidewaysTime = frame
+    lastMoveSidewaysInput = frame
     lastFallTime = 0
     movingDown = False  # note: there is no movingUp variable
     movingLeft = False
     movingRight = False
     canUseHold = True
-    lastTime = time.time()
     lockTime = LOCKTIME
+    lastPieceLock = None
+    lastSuccessfulMovement = None
+    ghostPieceYOffset = 0
     score = 0
+    combo = 0
+    lines = 0
     moves = 0
-    level, fallFreq = calculateLevelAndFallFreq(score)
+    linesGoal = 5
+    level = 1
+    level, fallFreq, linesGoal = calculateLevelAndFallFreq(lines, linesGoal, level)
 
     fallingPiece = getNewPiece()
     nextPieces = [getNewPiece() for _ in range(NEXTPIECES)]
@@ -269,9 +318,9 @@ def runGame():
                     pygame.mixer.music.stop()
                     showTextScreen('Paused')  # pause until a key press
                     pygame.mixer.music.play(-1, 0.0)
-                    lastFallTime = time.time()
-                    lastMoveDownTime = time.time()
-                    lastMoveSidewaysTime = time.time()
+                    lastFallTime = frame
+                    lastMoveDownTime = frame
+                    lastMoveSidewaysTime = frame
                 elif event.key == K_LEFT or event.key == K_a:
                     movingLeft = False
                 elif event.key == K_RIGHT or event.key == K_d:
@@ -285,7 +334,10 @@ def runGame():
                     fallingPiece['x'] -= 1
                     movingLeft = True
                     movingRight = False
-                    lastMoveSidewaysTime = time.time()
+                    lastMoveSidewaysTime = frame
+                    lastMoveSidewaysInput = frame
+                    lastSuccessfulMovement = "moveLeft"
+                    EFFECT_MOVE.play()
                     if not lockTime == LOCKTIME and moves < 16:
                         lockTime = LOCKTIME
                         moves += 1
@@ -294,27 +346,38 @@ def runGame():
                     fallingPiece['x'] += 1
                     movingRight = True
                     movingLeft = False
-                    lastMoveSidewaysTime = time.time()
+                    lastMoveSidewaysTime = frame
+                    lastMoveSidewaysInput = frame
+                    lastSuccessfulMovement = "moveRight"
+                    EFFECT_MOVE.play()
                     if not lockTime == LOCKTIME and moves < 16:
                         lockTime = LOCKTIME
                         moves += 1
 
                 # rotating the piece (if there is room to rotate)
                 elif event.key == K_UP or event.key == K_x:
-                    if rotatePiece(fallingPiece, 1, board) and not lockTime == LOCKTIME and moves < 16:
-                        lockTime = LOCKTIME
-                        moves += 1
+                    if rotatePiece(fallingPiece, 1, board):
+                        lastSuccessfulMovement = "rotate"
+                        EFFECT_ROTATE.play()
+                        if not lockTime == LOCKTIME and moves < 16:
+                            lockTime = LOCKTIME
+                            moves += 1
                 elif event.key == K_z:  # rotate the other direction
-                    if rotatePiece(fallingPiece, -1, board) and not lockTime == LOCKTIME and moves < 16:
-                        lockTime = LOCKTIME
-                        moves += 1
+                    if rotatePiece(fallingPiece, -1, board):
+                        lastSuccessfulMovement = "rotate"
+                        EFFECT_ROTATE.play()
+                        if not lockTime == LOCKTIME and moves < 16:
+                            lockTime = LOCKTIME
+                            moves += 1
 
                 # making the piece fall faster with the down key
                 elif event.key == K_DOWN or event.key == K_s:
                     movingDown = True
                     if isValidPosition(board, fallingPiece, adjY=1):
                         fallingPiece['y'] += 1
-                    lastMoveDownTime = time.time()
+                        score += 1
+                        lastSuccessfulMovement = "moveDown"
+                        lastMoveDownTime = frame
 
                 # move the current piece all the way down
                 elif event.key == K_SPACE:
@@ -325,11 +388,14 @@ def runGame():
                     for i in range(1, BOARDHEIGHT):
                         if not isValidPosition(board, fallingPiece, adjY=i):
                             fallingPiece['y'] += i - 1
+                            score += 2 * (i - 1)
+                            lastSuccessfulMovement = "moveDown"
                             break
 
                 # hold piece
                 elif (event.key == K_c) and canUseHold:
                     # swap hold and falling piece
+                    EFFECT_HOLD.play()
                     oldHoldPiece = holdPiece
                     holdPiece = fallingPiece
                     fallingPiece = oldHoldPiece
@@ -347,37 +413,82 @@ def runGame():
                     canUseHold = False
 
         # handle moving the piece because of user input
-        if (movingLeft or movingRight) and time.time() - lastMoveSidewaysTime > MOVESIDEWAYSFREQ:
+        if (
+                movingLeft or movingRight) and frame - lastMoveSidewaysTime > MOVESIDEWAYSFREQ and frame - lastMoveSidewaysInput > MOVESIDEWAYSDELAY:
             if movingLeft and isValidPosition(board, fallingPiece, adjX=-1):
                 fallingPiece['x'] -= 1
+                lastSuccessfulMovement = "moveLeft"
+                EFFECT_MOVE.play()
             elif movingRight and isValidPosition(board, fallingPiece, adjX=1):
                 fallingPiece['x'] += 1
-            lastMoveSidewaysTime = time.time()
+                lastSuccessfulMovement = "moveRight"
+                EFFECT_MOVE.play()
+            lastMoveSidewaysTime = frame
 
-        if movingDown and time.time() - lastMoveDownTime > MOVEDOWNFREQ:
+        if movingDown and frame - lastMoveDownTime > MOVEDOWNFREQ:
             if isValidPosition(board, fallingPiece, adjY=1):
                 fallingPiece['y'] += 1
-                lastMoveDownTime = time.time()
+                score += 1
+                lastSuccessfulMovement = "moveDown"
+                lastMoveDownTime = frame
 
         if not isValidPosition(board, fallingPiece, adjY=1):
-            lastFallTime = time.time()
-            lockTime -= time.time() - lastTime
+            lastFallTime = frame
+            lockTime -= 1
             if lockTime < 0:
                 if fallingPiece['y'] < 19:
                     return  # lock out: a piece locked in above the screen
+
+                # check for T-spin
+                tspin = checkForTSpin(fallingPiece, board, lastSuccessfulMovement)
+
                 addToBoard(board, fallingPiece)
-                score += removeCompleteLines(board)
-                level, fallFreq = calculateLevelAndFallFreq(score)
+                linesCleared = removeCompleteLines(board)
+
+                # line values for variable-goal levels
+                if linesCleared == 0:
+                    combo = 0
+                    EFFECT_LOCK.play()
+                elif linesCleared == 1:
+                    score += 20 * combo * level
+                    combo += 1
+                    EFFECT_CLEAR.play()
+                else:
+                    score += 50 * combo * level
+                    combo += 1
+                    EFFECT_CLEAR.play()
+
+                currentAction = str(linesCleared)
+                currentAction = tspin + currentAction
+
+                if currentAction == lastPieceLock:
+                    currentAction = "B" + currentAction
+
+                try:
+                    lines += LINE_CLEAR_DATA[currentAction]
+                except KeyError:
+                    pass
+
+                lastPieceLock = currentAction
+                score += SCORING_DATA[currentAction] * level
+
+                level, fallFreq, linesGoal = calculateLevelAndFallFreq(lines, linesGoal, level)
                 fallingPiece = None
 
-        lastTime = time.time()
-
         # let the piece fall if it is time to fall
-        if time.time() - lastFallTime > fallFreq:
-            lastFallTime = time.time()
+        if frame - lastFallTime > fallFreq:
+            lastFallTime = frame
             # see if the piece has landed
             if isValidPosition(board, fallingPiece, adjY=1):
                 fallingPiece['y'] += 1
+                lastSuccessfulMovement = "moveDown"
+
+        # calculate the ghost piece
+        if fallingPiece is not None:
+            for i in range(1, BOARDHEIGHT):
+                if not isValidPosition(board, fallingPiece, adjY=i):
+                    ghostPieceYOffset = i - 1
+                    break
 
         # drawing everything on the screen
         DISPLAYSURF.fill(BGCOLOR)
@@ -385,12 +496,38 @@ def runGame():
         drawNextPieces(nextPieces)
         drawHoldPiece(holdPiece)
         if fallingPiece is not None:
+            drawGhostPiece(fallingPiece, ghostPieceYOffset)
             drawPiece(fallingPiece)
         drawBoard(board)
         drawBoxToObscurePiece()
 
+        frame += 1
         pygame.display.update()
         FPSCLOCK.tick(FPS)
+
+
+def checkForTSpin(piece, board, lastSuccessfulMovement):
+    # check if T
+    if piece['shape'] != 'T':
+        return ""
+
+    # check if the last succesfull movement was a rotation
+    if lastSuccessfulMovement != "rotate":
+        return ""
+
+    # return "T" if 3 or more diagonals are obstructed
+    diagonalsObstructed = 0
+    for x in range(getWidth(piece)):
+        for y in range(getHeight(piece)):
+            if T_SPIN_CHECK_TEMPLATE[y][x] == BLANK:
+                continue
+            if board[x + piece['x']][y + piece['y']] != BLANK:
+                diagonalsObstructed += 1
+
+    if diagonalsObstructed >= 3:
+        return "T"
+    else:
+        return ""
 
 
 def rotatePiece(piece, rotation, board):
@@ -470,18 +607,21 @@ def showTextScreen(text):
 def checkForQuit():
     for _ in pygame.event.get(QUIT):  # get all the QUIT events
         terminate()  # terminate if any QUIT events are present
-    for event in pygame.event.get(KEYUP):  # get all the KEYUP events
-        if event.key == K_ESCAPE:
-            terminate()  # terminate if the KEYUP event was for the Esc key
-        pygame.event.post(event)  # put the other KEYUP event objects back
+    # for event in pygame.event.get(KEYUP):  # get all the KEYUP events
+    #     if event.key == K_ESCAPE:
+    #         terminate()  # terminate if the KEYUP event was for the Esc key
+    #     pygame.event.post(event)  # put the other KEYUP event objects back
 
 
-def calculateLevelAndFallFreq(score):
+def calculateLevelAndFallFreq(lines, linesGoal, level):
     # Based on the score, return the level the player is on and
     # how many seconds pass until a falling piece falls one space.
-    level = int(score / 10) + 1
-    fallFreq = 0.27 - (level * 0.02)
-    return level, fallFreq
+    if lines >= linesGoal:
+        level += 1
+        linesGoal += 5 * level
+
+    fallFreq = ((0.8 - ((level - 1) * 0.007)) ** (level - 1)) * FPS
+    return level, fallFreq, linesGoal
 
 
 def getNewPiece():
@@ -565,7 +705,7 @@ def convertToPixelCoords(boxx, boxy):
     return (XMARGIN + (boxx * BOXSIZE)), (TOPMARGIN - 400 + (boxy * BOXSIZE))
 
 
-def drawBox(boxx, boxy, draw_color, pixelx=None, pixely=None):
+def drawBox(boxx, boxy, draw_color, pixelx=None, pixely=None, ghost=False):
     # draw a single box (each tetromino piece has four boxes)
     # at xy coordinates on the board. Or, if pixelx & pixely
     # are specified, draw to the pixel coordinates stored in
@@ -575,7 +715,10 @@ def drawBox(boxx, boxy, draw_color, pixelx=None, pixely=None):
     if pixelx is None and pixely is None:
         pixelx, pixely = convertToPixelCoords(boxx, boxy)
     pygame.draw.rect(DISPLAYSURF, COLORS[draw_color], (pixelx + 1, pixely + 1, BOXSIZE - 1, BOXSIZE - 1))
-    pygame.draw.rect(DISPLAYSURF, LIGHTCOLORS[draw_color], (pixelx + 1, pixely + 1, BOXSIZE - 4, BOXSIZE - 4))
+    if ghost:
+        pygame.draw.rect(DISPLAYSURF, [0, 0, 0], (pixelx + 3, pixely + 3, BOXSIZE - 5, BOXSIZE - 5))
+    else:
+        pygame.draw.rect(DISPLAYSURF, LIGHTCOLORS[draw_color], (pixelx + 1, pixely + 1, BOXSIZE - 4, BOXSIZE - 4))
 
 
 def drawBoard(board):
@@ -628,6 +771,17 @@ def drawPiece(piece, pixelx=None, pixely=None):
         for y in range(getHeight(piece)):
             if shapeToDraw[y][x] != BLANK:
                 drawBox(None, None, piece['color'], pixelx + (x * BOXSIZE), pixely + (y * BOXSIZE))
+
+
+def drawGhostPiece(piece, ghostPieceYOffset):
+    shapeToDraw = PIECES[piece['shape']][piece['rotation']]
+    pixelx, pixely = convertToPixelCoords(piece['x'], piece['y'] + ghostPieceYOffset)
+
+    # draw each of the boxes that make up the piece
+    for x in range(getWidth(piece)):
+        for y in range(getHeight(piece)):
+            if shapeToDraw[y][x] != BLANK:
+                drawBox(None, None, piece['color'], pixelx + (x * BOXSIZE), pixely + (y * BOXSIZE), ghost=True)
 
 
 def drawNextPieces(pieces):
