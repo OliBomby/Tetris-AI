@@ -224,10 +224,10 @@ LINE_CLEAR_DATA = {'0': 0,
                    'T1': 3,
                    'T2': 7,
                    'T3': 6}
+pygame.init()
 
 if SOUND:
     pygame.mixer.pre_init(48000, 16, 2, 4096)
-    pygame.init()
     EFFECT_MOVE = pygame.mixer.Sound('move.wav')
     EFFECT_ROTATE = pygame.mixer.Sound('rotate.wav')
     EFFECT_HOLD = pygame.mixer.Sound('hold.wav')
@@ -513,7 +513,7 @@ class TetrisGame:
                 pygame.mixer.music.load('tetrisb.mid')
             else:
                 pygame.mixer.music.load('tetrisc.mid')
-        pygame.mixer.music.play(-1, 0.0)
+            pygame.mixer.music.play(-1, 0.0)
 
         # setup variables for the start of the game
         self.frame = 0
@@ -532,6 +532,7 @@ class TetrisGame:
         self.lastSuccessfulMovement = None
         self.ghostPieceYOffset = 0
         self.score = 0
+        self.lastScore = 0
         self.combo = 0
         self.lines = 0
         self.moves = 0
@@ -544,7 +545,7 @@ class TetrisGame:
         self.nextPieces = [getNewPiece(self.BAG) for _ in range(NEXTPIECES)]
         self.holdPiece = None
 
-    def resetGame(self):
+    def reset(self):
         self.frame = 0
         self.board = getBlankBoard()
         self.BAG.newBag()
@@ -573,8 +574,10 @@ class TetrisGame:
         self.nextPieces = [getNewPiece(self.BAG) for _ in range(NEXTPIECES)]
         self.holdPiece = None
 
+        return self.getFeatures()
+
     def gameOver(self):
-        self.resetGame()
+        self.reset()
 
     def runGame(self):
         # setup variables for the start of the game
@@ -584,6 +587,14 @@ class TetrisGame:
         while True:  # game loop
             event = np.random.permutation(emptyEvent)
             self.nextFrame(event)
+
+    def getFeatures(self):
+        board = np.zeros([BOARDWIDTH, BOARDHEIGHT])
+        for x in range(BOARDWIDTH):
+            for y in range(BOARDHEIGHT):
+                if self.board[x][y] != BLANK:
+                    board[x, y] = 1
+        return board.reshape(BOARDWIDTH * BOARDHEIGHT)
 
     def nextFrame(self, event=None):
         # [nothing, moveLeft, moveRight, rotateLeft, rotateRight, softDrop, hardDrop, Hold]
@@ -766,6 +777,9 @@ class TetrisGame:
                     self.ghostPieceYOffset = i - 1
                     break
 
+        scoreChange = self.score - self.lastScore
+        self.lastScore = self.score
+
         # drawing everything on the screen
         self.DISPLAYSURF.fill(BGCOLOR)
         drawStatus(self.score, self.level, self.DISPLAYSURF)
@@ -780,6 +794,8 @@ class TetrisGame:
         self.frame += 1
         pygame.display.update()
 
+        return self.getFeatures(), scoreChange, False, ""
+
     def calculateLevelAndFallFreq(self):
         # Based on the score, return the level the player is on and
         # how many seconds pass until a falling piece falls one space.
@@ -789,10 +805,8 @@ class TetrisGame:
 
         self.fallFreq = ((0.8 - ((self.level - 1) * 0.007)) ** (self.level - 1)) * FPS
 
-    def getFeatures(self):
-        return np.array(self.board).reshape(-1)
-
 
 if __name__ == '__main__':
     tetris = TetrisGame()
     tetris.runGame()
+
