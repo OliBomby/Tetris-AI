@@ -9,7 +9,7 @@ import random, pygame, sys
 from pygame.locals import *
 import numpy as np
 
-SOUND = True
+
 FPS = 60
 WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
@@ -18,6 +18,8 @@ BOARDWIDTH = 10
 BOARDHEIGHT = 40
 NEXTPIECES = 6
 BLANK = '.'
+SOUND = True
+NUM_INPUTS = 8
 
 MOVESIDEWAYSFREQ = 0.05 * FPS
 MOVESIDEWAYSDELAY = 0.2 * FPS
@@ -315,50 +317,6 @@ def terminate():
     sys.exit()
 
 
-def checkForKeyPress():
-    # Go through event queue looking for a KEYUP event.
-    # Grab KEYDOWN events to remove them from the event queue.
-    checkForQuit()
-
-    for event in pygame.event.get([KEYDOWN, KEYUP]):
-        if event.type == KEYDOWN:
-            continue
-        return event.key
-    return None
-
-
-def showTextScreen(text, DISPLAYSURF, FPSCLOCK):
-    # This function displays large text in the
-    # center of the screen until a key is pressed.
-    # Draw the text drop shadow
-    titleSurf, titleRect = makeTextObjs(text, BIGFONT, TEXTSHADOWCOLOR)
-    titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2))
-    DISPLAYSURF.blit(titleSurf, titleRect)
-
-    # Draw the text
-    titleSurf, titleRect = makeTextObjs(text, BIGFONT, TEXTCOLOR)
-    titleRect.center = (int(WINDOWWIDTH / 2) - 3, int(WINDOWHEIGHT / 2) - 3)
-    DISPLAYSURF.blit(titleSurf, titleRect)
-
-    # Draw the additional "Press a key to play." text.
-    pressKeySurf, pressKeyRect = makeTextObjs('Press a key to play.', BASICFONT, TEXTCOLOR)
-    pressKeyRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2) + 100)
-    DISPLAYSURF.blit(pressKeySurf, pressKeyRect)
-
-    while checkForKeyPress() is None:
-        pygame.display.update()
-        FPSCLOCK.tick(FPS)
-
-
-def checkForQuit():
-    for _ in pygame.event.get(QUIT):  # get all the QUIT events
-        terminate()  # terminate if any QUIT events are present
-    # for event in pygame.event.get(KEYUP):  # get all the KEYUP events
-    #     if event.key == K_ESCAPE:
-    #         terminate()  # terminate if the KEYUP event was for the Esc key
-    #     pygame.event.post(event)  # put the other KEYUP event objects back
-
-
 def getNewPiece(BAG):
     # return a random new piece in a random rotation and color
     shape = BAG.getPiece()
@@ -548,7 +506,6 @@ class TetrisGame:
         self.FPSCLOCK = pygame.time.Clock()
 
         pygame.display.set_caption('Tetromino')
-        showTextScreen('Tetromino', self.DISPLAYSURF, self.FPSCLOCK)
 
         # start music
         if SOUND:
@@ -588,14 +545,6 @@ class TetrisGame:
         self.holdPiece = None
 
     def resetGame(self):
-        # start music
-        if SOUND:
-            if random.randint(0, 1) == 0:
-                pygame.mixer.music.load('tetrisb.mid')
-            else:
-                pygame.mixer.music.load('tetrisc.mid')
-        pygame.mixer.music.play(-1, 0.0)
-
         self.frame = 0
         self.board = getBlankBoard()
         self.BAG.newBag()
@@ -624,22 +573,24 @@ class TetrisGame:
         self.nextPieces = [getNewPiece(self.BAG) for _ in range(NEXTPIECES)]
         self.holdPiece = None
 
-    def endGame(self):
-        pygame.mixer.music.stop()
-        showTextScreen('Game Over', self.DISPLAYSURF, self.FPSCLOCK)
-
     def gameOver(self):
-        self.endGame()
         self.resetGame()
 
     def runGame(self):
         # setup variables for the start of the game
+        emptyEvent = np.zeros(NUM_INPUTS)
+        emptyEvent[0] = 1
 
         while True:  # game loop
-            self.nextFrame()
-            self.FPSCLOCK.tick(FPS)
+            event = np.random.permutation(emptyEvent)
+            self.nextFrame(event)
 
-    def nextFrame(self):
+    def nextFrame(self, event=None):
+        # [nothing, moveLeft, moveRight, rotateLeft, rotateRight, softDrop, hardDrop, Hold]
+        if event is None:
+            event = np.zeros(NUM_INPUTS)
+            event[0] = 1
+
         if self.fallingPiece is None:
             # No falling piece in play, so start a new piece at the top
             self.fallingPiece = self.nextPieces.pop(0)
@@ -653,108 +604,88 @@ class TetrisGame:
                 self.gameOver()  # can't fit a new piece on the board, so game over
                 return
 
-        checkForQuit()
-        for event in pygame.event.get():  # event handling loop
-            if event.type == KEYUP:
-                if event.key == K_ESCAPE:
-                    # Pausing the game
-                    self.DISPLAYSURF.fill(BGCOLOR)
-                    pygame.mixer.music.stop()
-                    showTextScreen('Paused', self.DISPLAYSURF, self.FPSCLOCK)  # pause until a key press
-                    pygame.mixer.music.play(-1, 0.0)
-                    self.lastFallTime = self.frame
-                    self.lastMoveDownTime = self.frame
-                    self.lastMoveSidewaysTime = self.frame
-                elif event.key == K_LEFT or event.key == K_a:
-                    self.movingLeft = False
-                elif event.key == K_RIGHT or event.key == K_d:
-                    self.movingRight = False
-                elif event.key == K_DOWN or event.key == K_s:
-                    self.movingDown = False
+        # moving the piece sideways
+        if event[1] and isValidPosition(self.board, self.fallingPiece, adjX=-1):
+            self.fallingPiece['x'] -= 1
+            self.movingLeft = True
+            self.movingRight = False
+            self.lastMoveSidewaysTime = self.frame
+            self.lastMoveSidewaysInput = self.frame
+            self.lastSuccessfulMovement = "moveLeft"
+            EFFECT_MOVE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
 
-            elif event.type == KEYDOWN:
-                # moving the piece sideways
-                if (event.key == K_LEFT or event.key == K_a) and isValidPosition(self.board, self.fallingPiece, adjX=-1):
-                    self.fallingPiece['x'] -= 1
-                    self.movingLeft = True
-                    self.movingRight = False
-                    self.lastMoveSidewaysTime = self.frame
-                    self.lastMoveSidewaysInput = self.frame
-                    self.lastSuccessfulMovement = "moveLeft"
-                    EFFECT_MOVE.play()
-                    if not self.lockTime == LOCKTIME and self.moves < 16:
-                        self.lockTime = LOCKTIME
-                        self.moves += 1
+        if event[2] and isValidPosition(self.board, self.fallingPiece, adjX=1):
+            self.fallingPiece['x'] += 1
+            self.movingRight = True
+            self.movingLeft = False
+            self.lastMoveSidewaysTime = self.frame
+            self.lastMoveSidewaysInput = self.frame
+            self.lastSuccessfulMovement = "moveRight"
+            EFFECT_MOVE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
 
-                elif (event.key == K_RIGHT or event.key == K_d) and isValidPosition(self.board, self.fallingPiece, adjX=1):
-                    self.fallingPiece['x'] += 1
-                    self.movingRight = True
-                    self.movingLeft = False
-                    self.lastMoveSidewaysTime = self.frame
-                    self.lastMoveSidewaysInput = self.frame
-                    self.lastSuccessfulMovement = "moveRight"
-                    EFFECT_MOVE.play()
-                    if not self.lockTime == LOCKTIME and self.moves < 16:
-                        self.lockTime = LOCKTIME
-                        self.moves += 1
-
-                # rotating the piece (if there is room to rotate)
-                elif event.key == K_UP or event.key == K_x:
-                    if rotatePiece(self.fallingPiece, 1, self.board):
-                        self.lastSuccessfulMovement = "rotate"
-                        EFFECT_ROTATE.play()
-                        if not self.lockTime == LOCKTIME and self.moves < 16:
-                            self.lockTime = LOCKTIME
-                            self.moves += 1
-                elif event.key == K_z:  # rotate the other direction
-                    if rotatePiece(self.fallingPiece, -1, self.board):
-                        self.lastSuccessfulMovement = "rotate"
-                        EFFECT_ROTATE.play()
-                        if not self.lockTime == LOCKTIME and self.moves < 16:
-                            self.lockTime = LOCKTIME
-                            self.moves += 1
-
-                # making the piece fall faster with the down key
-                elif event.key == K_DOWN or event.key == K_s:
-                    self.movingDown = True
-                    if isValidPosition(self.board, self.fallingPiece, adjY=1):
-                        self.fallingPiece['y'] += 1
-                        self.score += 1
-                        self.lastSuccessfulMovement = "moveDown"
-                        self.lastMoveDownTime = self.frame
-
-                # move the current piece all the way down
-                elif event.key == K_SPACE:
-                    self.movingDown = False
-                    self.movingLeft = False
-                    self.movingRight = False
-                    self.lockTime = -1
-                    for i in range(1, BOARDHEIGHT):
-                        if not isValidPosition(self.board, self.fallingPiece, adjY=i):
-                            self.fallingPiece['y'] += i - 1
-                            self.score += 2 * (i - 1)
-                            self.lastSuccessfulMovement = "moveDown"
-                            break
-
-                # hold piece
-                elif (event.key == K_c) and self.canUseHold:
-                    # swap hold and falling piece
-                    EFFECT_HOLD.play()
-                    oldHoldPiece = self.holdPiece
-                    self.holdPiece = self.fallingPiece
-                    self.fallingPiece = oldHoldPiece
-                    if self.fallingPiece is None:
-                        self.fallingPiece = self.nextPieces.pop(0)
-                        self.nextPieces.append(getNewPiece(self.BAG))
-
-                    self.lastFallTime = 0  # reset lastFallTime
+        # rotating the piece (if there is room to rotate)
+        if event[3]:
+            if rotatePiece(self.fallingPiece, 1, self.board):
+                self.lastSuccessfulMovement = "rotate"
+                EFFECT_ROTATE.play()
+                if not self.lockTime == LOCKTIME and self.moves < 16:
                     self.lockTime = LOCKTIME
-                    self.moves = 0
+                    self.moves += 1
+        if event[4]:  # rotate the other direction
+            if rotatePiece(self.fallingPiece, -1, self.board):
+                self.lastSuccessfulMovement = "rotate"
+                EFFECT_ROTATE.play()
+                if not self.lockTime == LOCKTIME and self.moves < 16:
+                    self.lockTime = LOCKTIME
+                    self.moves += 1
 
-                    self.holdPiece['rotation'] = 0
-                    self.holdPiece['x'] = 3
-                    self.holdPiece['y'] = 18
-                    self.canUseHold = False
+        # making the piece fall faster with the down key
+        if event[5]:
+            self.movingDown = True
+            if isValidPosition(self.board, self.fallingPiece, adjY=1):
+                self.fallingPiece['y'] += 1
+                self.score += 1
+                self.lastSuccessfulMovement = "moveDown"
+                self.lastMoveDownTime = self.frame
+
+        # move the current piece all the way down
+        if event[6]:
+            self.movingDown = False
+            self.movingLeft = False
+            self.movingRight = False
+            self.lockTime = -1
+            for i in range(1, BOARDHEIGHT):
+                if not isValidPosition(self.board, self.fallingPiece, adjY=i):
+                    self.fallingPiece['y'] += i - 1
+                    self.score += 2 * (i - 1)
+                    self.lastSuccessfulMovement = "moveDown"
+                    break
+
+        # hold piece
+        if event[7] and self.canUseHold:
+            # swap hold and falling piece
+            EFFECT_HOLD.play()
+            oldHoldPiece = self.holdPiece
+            self.holdPiece = self.fallingPiece
+            self.fallingPiece = oldHoldPiece
+            if self.fallingPiece is None:
+                self.fallingPiece = self.nextPieces.pop(0)
+                self.nextPieces.append(getNewPiece(self.BAG))
+
+            self.lastFallTime = 0  # reset lastFallTime
+            self.lockTime = LOCKTIME
+            self.moves = 0
+
+            self.holdPiece['rotation'] = 0
+            self.holdPiece['x'] = 3
+            self.holdPiece['y'] = 18
+            self.canUseHold = False
 
         # handle moving the piece because of user input
         if (self.movingLeft or self.movingRight) and self.frame - self.lastMoveSidewaysTime > MOVESIDEWAYSFREQ and self.frame - self.lastMoveSidewaysInput > MOVESIDEWAYSDELAY:
@@ -775,6 +706,7 @@ class TetrisGame:
                 self.lastSuccessfulMovement = "moveDown"
                 self.lastMoveDownTime = self.frame
 
+        # check if the falling piece is touching the ground
         if not isValidPosition(self.board, self.fallingPiece, adjY=1):
             self.lastFallTime = self.frame
             self.lockTime -= 1
