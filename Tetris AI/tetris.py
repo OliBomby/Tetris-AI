@@ -246,9 +246,8 @@ class Bag:
 
 
 def main():
-    global FPSCLOCK, DISPLAYSURF, BASICFONT, BIGFONT, BAG
+    global DISPLAYSURF, BASICFONT, BIGFONT, BAG
     pygame.init()
-    FPSCLOCK = pygame.time.Clock()
     DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
     BASICFONT = pygame.font.Font('freesansbold.ttf', 18)
     BIGFONT = pygame.font.Font('freesansbold.ttf', 100)
@@ -503,7 +502,6 @@ def runGame():
 
         frame += 1
         pygame.display.update()
-        FPSCLOCK.tick(FPS)
 
 
 def checkForTSpin(piece, board, lastSuccessfulMovement):
