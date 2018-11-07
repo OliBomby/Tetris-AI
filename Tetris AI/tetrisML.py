@@ -7,6 +7,7 @@
 
 import random, pygame, sys
 from pygame.locals import *
+import numpy as np
 
 SOUND = True
 FPS = 60
@@ -855,6 +856,9 @@ class TetrisGame:
             self.linesGoal += 5 * self.level
 
         self.fallFreq = ((0.8 - ((self.level - 1) * 0.007)) ** (self.level - 1)) * FPS
+
+    def getFeatures(self):
+        return np.array(self.board).reshape(-1)
 
 
 if __name__ == '__main__':
