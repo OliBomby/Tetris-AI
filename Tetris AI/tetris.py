@@ -8,6 +8,7 @@
 import random, time, pygame, sys
 from pygame.locals import *
 
+SOUND = True
 FPS = 60
 WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
@@ -221,13 +222,14 @@ LINE_CLEAR_DATA = {'0': 0,
                    'T2': 7,
                    'T3': 6}
 
-pygame.mixer.pre_init(48000, 16, 2, 4096)
-pygame.init()
-EFFECT_MOVE = pygame.mixer.Sound('move.wav')
-EFFECT_ROTATE = pygame.mixer.Sound('rotate.wav')
-EFFECT_HOLD = pygame.mixer.Sound('hold.wav')
-EFFECT_LOCK = pygame.mixer.Sound('lock.wav')
-EFFECT_CLEAR = pygame.mixer.Sound('clear.wav')
+if SOUND:
+    pygame.mixer.pre_init(48000, 16, 2, 4096)
+    pygame.init()
+    EFFECT_MOVE = pygame.mixer.Sound('move.wav')
+    EFFECT_ROTATE = pygame.mixer.Sound('rotate.wav')
+    EFFECT_HOLD = pygame.mixer.Sound('hold.wav')
+    EFFECT_LOCK = pygame.mixer.Sound('lock.wav')
+    EFFECT_CLEAR = pygame.mixer.Sound('clear.wav')
 
 class Bag:
     def __init__(self):
@@ -256,10 +258,11 @@ def main():
 
     showTextScreen('Tetromino')
     while True:  # game loop
-        if random.randint(0, 1) == 0:
-            pygame.mixer.music.load('tetrisb.mid')
-        else:
-            pygame.mixer.music.load('tetrisc.mid')
+        if SOUND:
+            if random.randint(0, 1) == 0:
+                pygame.mixer.music.load('tetrisb.mid')
+            else:
+                pygame.mixer.music.load('tetrisc.mid')
         pygame.mixer.music.play(-1, 0.0)
         runGame()
         pygame.mixer.music.stop()
