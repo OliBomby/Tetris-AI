@@ -61,27 +61,32 @@ class DoubleDQN:
         self.cost_his = []
 
     def _build_net(self):
-        def build_layers(s, c_names, n_l1, w_initializer, b_initializer):
+        def build_layers(s, c_names, n_l1, n_l2, w_initializer, b_initializer):
             with tf.variable_scope('l1'):
                 w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(s, w1) + b1)
 
             with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                out = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [n_l1, n_l2], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, n_l2], initializer=b_initializer, collections=c_names)
+                l2 = tf.matmul(l1, w2) + b2
+
+            with tf.variable_scope('l3'):
+                w3 = tf.get_variable('w3', [n_l2, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                out = tf.matmul(l2, w3) + b3
             return out
         # ------------------ build evaluate_net ------------------
         self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
         self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
 
         with tf.variable_scope('eval_net'):
-            c_names, n_l1, w_initializer, b_initializer = \
-                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 20, \
+            c_names, n_l1, n_l2, w_initializer, b_initializer = \
+                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 2000, 2000, \
                 tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)  # config of layers
 
-            self.q_eval = build_layers(self.s, c_names, n_l1, w_initializer, b_initializer)
+            self.q_eval = build_layers(self.s, c_names, n_l1, n_l2, w_initializer, b_initializer)
 
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval))
@@ -93,7 +98,7 @@ class DoubleDQN:
         with tf.variable_scope('target_net'):
             c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
 
-            self.q_next = build_layers(self.s_, c_names, n_l1, w_initializer, b_initializer)
+            self.q_next = build_layers(self.s_, c_names, n_l1, n_l2, w_initializer, b_initializer)
 
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):

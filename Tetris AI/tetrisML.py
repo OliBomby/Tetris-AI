@@ -18,7 +18,7 @@ BOARDWIDTH = 10
 BOARDHEIGHT = 40
 NEXTPIECES = 6
 BLANK = '.'
-SOUND = True
+SOUND = False
 NUM_INPUTS = 8
 
 MOVESIDEWAYSFREQ = 0.05 * FPS
@@ -224,6 +224,16 @@ LINE_CLEAR_DATA = {'0': 0,
                    'T1': 3,
                    'T2': 7,
                    'T3': 6}
+
+PIECES_ONEHOT = {'None': np.array([1, 0, 0, 0, 0, 0, 0, 0]),
+                 'S': np.array([0, 1, 0, 0, 0, 0, 0, 0]),
+                 'Z': np.array([0, 0, 1, 0, 0, 0, 0, 0]),
+                 'J': np.array([0, 0, 0, 1, 0, 0, 0, 0]),
+                 'L': np.array([0, 0, 0, 0, 1, 0, 0, 0]),
+                 'I': np.array([0, 0, 0, 0, 0, 1, 0, 0]),
+                 'O': np.array([0, 0, 0, 0, 0, 0, 1, 0]),
+                 'T': np.array([0, 0, 0, 0, 0, 0, 0, 1])}
+
 pygame.init()
 
 if SOUND:
@@ -269,7 +279,10 @@ def checkForTSpin(piece, board, lastSuccessfulMovement):
         for y in range(getHeight(piece)):
             if T_SPIN_CHECK_TEMPLATE[y][x] == BLANK:
                 continue
-            if board[x + piece['x']][y + piece['y']] != BLANK:
+            try:
+                if board[x + piece['x']][y + piece['y']] != BLANK:
+                    diagonalsObstructed += 1
+            except IndexError:
                 diagonalsObstructed += 1
 
     if diagonalsObstructed >= 3:
@@ -360,36 +373,6 @@ def isValidPosition(board, piece, adjX=0, adjY=0):
             if board[x + piece['x'] + adjX][y + piece['y'] + adjY] != BLANK:
                 return False
     return True
-
-
-def isCompleteLine(board, y):
-    # Return True if the line filled with boxes with no gaps.
-    for x in range(BOARDWIDTH):
-        if board[x][y] == BLANK:
-            return False
-    return True
-
-
-def removeCompleteLines(board):
-    # Remove any completed lines on the board, move everything above them down, and return the number of complete lines.
-    numLinesRemoved = 0
-    y = BOARDHEIGHT - 1  # start y at the bottom of the board
-    while y >= 0:
-        if isCompleteLine(board, y):
-            # Remove the line and pull boxes down by one line.
-            for pullDownY in range(y, 0, -1):
-                for x in range(BOARDWIDTH):
-                    board[x][pullDownY] = board[x][pullDownY - 1]
-            # Set very top line to blank.
-            for x in range(BOARDWIDTH):
-                board[x][0] = BLANK
-            numLinesRemoved += 1
-            # Note on the next iteration of the loop, y is the same.
-            # This is so that if the line that was pulled down is also
-            # complete, it will be removed.
-        else:
-            y -= 1  # move on to check next row up
-    return numLinesRemoved
 
 
 def convertToPixelCoords(boxx, boxy):
@@ -519,13 +502,7 @@ class TetrisGame:
         self.frame = 0
         self.board = getBlankBoard()
         self.BAG.newBag()
-        self.lastMoveDownTime = self.frame
-        self.lastMoveSidewaysTime = self.frame
-        self.lastMoveSidewaysInput = self.frame
         self.lastFallTime = 0
-        self.movingDown = False  # note: there is no movingUp variable
-        self.movingLeft = False
-        self.movingRight = False
         self.canUseHold = True
         self.lockTime = LOCKTIME
         self.lastPieceLock = None
@@ -549,19 +526,14 @@ class TetrisGame:
         self.frame = 0
         self.board = getBlankBoard()
         self.BAG.newBag()
-        self.lastMoveDownTime = self.frame
-        self.lastMoveSidewaysTime = self.frame
-        self.lastMoveSidewaysInput = self.frame
         self.lastFallTime = 0
-        self.movingDown = False  # note: there is no movingUp variable
-        self.movingLeft = False
-        self.movingRight = False
         self.canUseHold = True
         self.lockTime = LOCKTIME
         self.lastPieceLock = None
         self.lastSuccessfulMovement = None
         self.ghostPieceYOffset = 0
         self.score = 0
+        self.lastScore = 0
         self.combo = 0
         self.lines = 0
         self.moves = 0
@@ -581,141 +553,72 @@ class TetrisGame:
 
     def runGame(self):
         # setup variables for the start of the game
-        emptyEvent = np.zeros(NUM_INPUTS)
-        emptyEvent[0] = 1
 
         while True:  # game loop
-            event = np.random.permutation(emptyEvent)
-            self.nextFrame(event)
+            self.nextFrame(np.random.randint(0, 41))
 
     def getFeatures(self):
+        # get board
         board = np.zeros([BOARDWIDTH, BOARDHEIGHT])
         for x in range(BOARDWIDTH):
             for y in range(BOARDHEIGHT):
                 if self.board[x][y] != BLANK:
                     board[x, y] = 1
-        return board.reshape(BOARDWIDTH * BOARDHEIGHT)
 
-    def nextFrame(self, event=None):
-        # [nothing, moveLeft, moveRight, rotateLeft, rotateRight, softDrop, hardDrop, Hold]
-        if event is None:
-            event = np.zeros(NUM_INPUTS)
-            event[0] = 1
+        # add fallingpiece to board
+        for x in range(getWidth(self.fallingPiece)):
+            for y in range(getHeight(self.fallingPiece)):
+                if PIECES[self.fallingPiece['shape']][self.fallingPiece['rotation']][y][x] != BLANK:
+                    board[x + self.fallingPiece['x'], y + self.fallingPiece['y']] = 1
 
-        if self.fallingPiece is None:
-            # No falling piece in play, so start a new piece at the top
-            self.fallingPiece = self.nextPieces.pop(0)
-            self.nextPieces.append(getNewPiece(self.BAG))
-            self.lastFallTime = 0  # reset lastFallTime
-            self.lockTime = LOCKTIME
-            self.moves = 0
-            self.canUseHold = True
+        # append data about pieces
+        board = board.reshape(BOARDWIDTH * BOARDHEIGHT)
 
-            if not isValidPosition(self.board, self.fallingPiece):
-                self.gameOver()  # can't fit a new piece on the board, so game over
-                return
+        if self.fallingPiece is not None:
+            board = np.append(board, np.array(self.fallingPiece['x']))
+            board = np.append(board, np.array(self.fallingPiece['y']))
+            board = np.concatenate((board, PIECES_ONEHOT[self.fallingPiece['shape']]))
+        else:
+            board = np.concatenate((board, PIECES_ONEHOT['None']))
 
-        # moving the piece sideways
-        if event[1] and isValidPosition(self.board, self.fallingPiece, adjX=-1):
-            self.fallingPiece['x'] -= 1
-            self.movingLeft = True
-            self.movingRight = False
-            self.lastMoveSidewaysTime = self.frame
-            self.lastMoveSidewaysInput = self.frame
-            self.lastSuccessfulMovement = "moveLeft"
-            EFFECT_MOVE.play()
-            if not self.lockTime == LOCKTIME and self.moves < 16:
-                self.lockTime = LOCKTIME
-                self.moves += 1
+        if self.holdPiece is not None:
+            board = np.concatenate((board, PIECES_ONEHOT[self.holdPiece['shape']]))
+        else:
+            board = np.concatenate((board, PIECES_ONEHOT['None']))
 
-        if event[2] and isValidPosition(self.board, self.fallingPiece, adjX=1):
-            self.fallingPiece['x'] += 1
-            self.movingRight = True
-            self.movingLeft = False
-            self.lastMoveSidewaysTime = self.frame
-            self.lastMoveSidewaysInput = self.frame
-            self.lastSuccessfulMovement = "moveRight"
-            EFFECT_MOVE.play()
-            if not self.lockTime == LOCKTIME and self.moves < 16:
-                self.lockTime = LOCKTIME
-                self.moves += 1
+        for piece in self.nextPieces:
+            board = np.concatenate((board, PIECES_ONEHOT[piece['shape']]))
 
-        # rotating the piece (if there is room to rotate)
-        if event[3]:
-            if rotatePiece(self.fallingPiece, 1, self.board):
-                self.lastSuccessfulMovement = "rotate"
-                EFFECT_ROTATE.play()
-                if not self.lockTime == LOCKTIME and self.moves < 16:
-                    self.lockTime = LOCKTIME
-                    self.moves += 1
-        if event[4]:  # rotate the other direction
-            if rotatePiece(self.fallingPiece, -1, self.board):
-                self.lastSuccessfulMovement = "rotate"
-                EFFECT_ROTATE.play()
-                if not self.lockTime == LOCKTIME and self.moves < 16:
-                    self.lockTime = LOCKTIME
-                    self.moves += 1
+        return board
 
-        # making the piece fall faster with the down key
-        if event[5]:
-            self.movingDown = True
-            if isValidPosition(self.board, self.fallingPiece, adjY=1):
-                self.fallingPiece['y'] += 1
-                self.score += 1
-                self.lastSuccessfulMovement = "moveDown"
-                self.lastMoveDownTime = self.frame
+    def nextFrame(self, action=0):
+        if action < 40:
+            # 10 columns, 4 rotations, 40 actions
+            # action range from 0 to 39
+            # column 0 to 9
+            column = int(np.floor(action / 4))
+            # rotation 0 to 3
+            rotation = int(np.remainder(action, 4))
 
-        # move the current piece all the way down
-        if event[6]:
-            self.movingDown = False
-            self.movingLeft = False
-            self.movingRight = False
-            self.lockTime = -1
-            for i in range(1, BOARDHEIGHT):
-                if not isValidPosition(self.board, self.fallingPiece, adjY=i):
-                    self.fallingPiece['y'] += i - 1
-                    self.score += 2 * (i - 1)
-                    self.lastSuccessfulMovement = "moveDown"
-                    break
+            # rotate right n times
+            for n in range(rotation):
+                self.rotateRight()
 
-        # hold piece
-        if event[7] and self.canUseHold:
-            # swap hold and falling piece
-            EFFECT_HOLD.play()
-            oldHoldPiece = self.holdPiece
-            self.holdPiece = self.fallingPiece
-            self.fallingPiece = oldHoldPiece
-            if self.fallingPiece is None:
-                self.fallingPiece = self.nextPieces.pop(0)
-                self.nextPieces.append(getNewPiece(self.BAG))
+            # move to column
+            movement = column - 4
+            if movement < 0:
+                for n in range(0 - movement):
+                    self.moveLeft()
+            else:
+                for n in range(movement):
+                    self.moveRight()
 
-            self.lastFallTime = 0  # reset lastFallTime
-            self.lockTime = LOCKTIME
-            self.moves = 0
+            # hard drop
+            self.hardDrop()
 
-            self.holdPiece['rotation'] = 0
-            self.holdPiece['x'] = 3
-            self.holdPiece['y'] = 18
-            self.canUseHold = False
-
-        # handle moving the piece because of user input
-        if (self.movingLeft or self.movingRight) and self.frame - self.lastMoveSidewaysTime > MOVESIDEWAYSFREQ and self.frame - self.lastMoveSidewaysInput > MOVESIDEWAYSDELAY:
-            if self.movingLeft and isValidPosition(self.board, self.fallingPiece, adjX=-1):
-                self.fallingPiece['x'] -= 1
-                self.lastSuccessfulMovement = "moveLeft"
-                EFFECT_MOVE.play()
-            elif self.movingRight and isValidPosition(self.board, self.fallingPiece, adjX=1):
-                self.fallingPiece['x'] += 1
-                self.lastSuccessfulMovement = "moveRight"
-                EFFECT_MOVE.play()
-            self.lastMoveSidewaysTime = self.frame
-
-        if self.movingDown and self.frame - self.lastMoveDownTime > MOVEDOWNFREQ:
-            if isValidPosition(self.board, self.fallingPiece, adjY=1):
-                self.fallingPiece['y'] += 1
-                self.score += 1
-                self.lastSuccessfulMovement = "moveDown"
-                self.lastMoveDownTime = self.frame
+        else:
+            # action is hold
+            self.hold()
 
         # check if the falling piece is touching the ground
         if not isValidPosition(self.board, self.fallingPiece, adjY=1):
@@ -724,26 +627,29 @@ class TetrisGame:
             if self.lockTime < 0:
                 if self.fallingPiece['y'] < 19:
                     self.gameOver()  # lock out: a piece locked in above the screen
-                    return
+                    return self.getFeatures(), -1000, False, ""
 
                 # check for T-spin
                 tspin = checkForTSpin(self.fallingPiece, self.board, self.lastSuccessfulMovement)
 
                 addToBoard(self.board, self.fallingPiece)
-                linesCleared = removeCompleteLines(self.board)
+                linesCleared = self.removeCompleteLines(self.board)
 
                 # line values for variable-goal levels
                 if linesCleared == 0:
                     self.combo = 0
-                    EFFECT_LOCK.play()
+                    if SOUND:
+                        EFFECT_LOCK.play()
                 elif linesCleared == 1:
                     self.score += 20 * self.combo * self.level
                     self.combo += 1
-                    EFFECT_CLEAR.play()
+                    if SOUND:
+                        EFFECT_CLEAR.play()
                 else:
                     self.score += 50 * self.combo * self.level
                     self.combo += 1
-                    EFFECT_CLEAR.play()
+                    if SOUND:
+                        EFFECT_CLEAR.play()
 
                 currentAction = str(linesCleared)
                 currentAction = tspin + currentAction
@@ -760,7 +666,18 @@ class TetrisGame:
                 self.score += SCORING_DATA[currentAction] * self.level
 
                 self.calculateLevelAndFallFreq()
-                self.fallingPiece = None
+
+                # No falling piece in play, so start a new piece at the top
+                self.fallingPiece = self.nextPieces.pop(0)
+                self.nextPieces.append(getNewPiece(self.BAG))
+                self.lastFallTime = 0  # reset lastFallTime
+                self.lockTime = LOCKTIME
+                self.moves = 0
+                self.canUseHold = True
+
+                if not isValidPosition(self.board, self.fallingPiece):
+                    self.gameOver()  # can't fit a new piece on the board, so game over
+                    return self.getFeatures(), -1000, False, ""
 
         # let the piece fall if it is time to fall
         if self.frame - self.lastFallTime > self.fallFreq:
@@ -792,6 +709,7 @@ class TetrisGame:
         drawBoxToObscurePiece(self.DISPLAYSURF)
 
         self.frame += 1
+        pygame.event.pump()
         pygame.display.update()
 
         return self.getFeatures(), scoreChange, False, ""
@@ -804,6 +722,116 @@ class TetrisGame:
             self.linesGoal += 5 * self.level
 
         self.fallFreq = ((0.8 - ((self.level - 1) * 0.007)) ** (self.level - 1)) * FPS
+
+    def isCompleteLine(self, board, y):
+        # Return True if the line filled with boxes with no gaps.
+        ret = True
+        for x in range(BOARDWIDTH):
+            if board[x][y] == BLANK:
+                ret = False
+        return ret
+
+    def removeCompleteLines(self, board):
+        # Remove any completed lines on the board, move everything above them down, and return the number of complete lines.
+        numLinesRemoved = 0
+        y = BOARDHEIGHT - 1  # start y at the bottom of the board
+        while y >= 0:
+            if self.isCompleteLine(board, y):
+                # Remove the line and pull boxes down by one line.
+                for pullDownY in range(y, 0, -1):
+                    for x in range(BOARDWIDTH):
+                        board[x][pullDownY] = board[x][pullDownY - 1]
+                # Set very top line to blank.
+                for x in range(BOARDWIDTH):
+                    board[x][0] = BLANK
+                numLinesRemoved += 1
+                # Note on the next iteration of the loop, y is the same.
+                # This is so that if the line that was pulled down is also
+                # complete, it will be removed.
+            else:
+                y -= 1  # move on to check next row up
+        return numLinesRemoved
+
+    def hold(self):
+        # hold piece
+        if self.canUseHold:
+            # swap hold and falling piece
+            if SOUND:
+                EFFECT_HOLD.play()
+            oldHoldPiece = self.holdPiece
+            self.holdPiece = self.fallingPiece
+            self.fallingPiece = oldHoldPiece
+            if self.fallingPiece is None:
+                self.fallingPiece = self.nextPieces.pop(0)
+                self.nextPieces.append(getNewPiece(self.BAG))
+
+            self.lastFallTime = 0  # reset lastFallTime
+            self.lockTime = LOCKTIME
+            self.moves = 0
+
+            self.holdPiece['rotation'] = 0
+            self.holdPiece['x'] = 3
+            self.holdPiece['y'] = 18
+            self.canUseHold = False
+
+    def moveLeft(self):
+        # moving the piece left
+        if isValidPosition(self.board, self.fallingPiece, adjX=-1):
+            self.fallingPiece['x'] -= 1
+            self.lastSuccessfulMovement = "moveLeft"
+            if SOUND:
+                EFFECT_MOVE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
+
+    def moveRight(self):
+        # moving the piece right
+        if isValidPosition(self.board, self.fallingPiece, adjX=1):
+            self.fallingPiece['x'] += 1
+            self.lastSuccessfulMovement = "moveRight"
+            if SOUND:
+                EFFECT_MOVE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
+
+    def rotateRight(self):
+        # rotating the piece (if there is room to rotate)
+        if rotatePiece(self.fallingPiece, 1, self.board):
+            self.lastSuccessfulMovement = "rotate"
+            if SOUND:
+                EFFECT_ROTATE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
+
+    def rotateLeft(self):
+        # rotate the other direction
+        if rotatePiece(self.fallingPiece, -1, self.board):
+            self.lastSuccessfulMovement = "rotate"
+            if SOUND:
+                EFFECT_ROTATE.play()
+            if not self.lockTime == LOCKTIME and self.moves < 16:
+                self.lockTime = LOCKTIME
+                self.moves += 1
+
+    def softDrop(self):
+        # making the piece fall faster with the down key
+        if isValidPosition(self.board, self.fallingPiece, adjY=1):
+            self.fallingPiece['y'] += 1
+            self.score += 1
+            self.lastSuccessfulMovement = "moveDown"
+
+    def hardDrop(self):
+        # move the current piece all the way down
+        self.lockTime = -1
+        for i in range(1, BOARDHEIGHT):
+            if not isValidPosition(self.board, self.fallingPiece, adjY=i):
+                self.fallingPiece['y'] += i - 1
+                self.score += 2 * (i - 1)
+                self.lastSuccessfulMovement = "moveDown"
+                break
 
 
 if __name__ == '__main__':

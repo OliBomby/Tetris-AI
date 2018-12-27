@@ -19,20 +19,20 @@ import tensorflow as tf
 
 env = tetrisML.TetrisGame()
 
-MEMORY_SIZE = 3000
-ACTION_SPACE = 8
+MEMORY_SIZE = 500
+ACTION_SPACE = 41
 
 sess = tf.Session()
 with tf.variable_scope('Natural_DQN'):
     natural_DQN = DoubleDQN(
-        n_actions=ACTION_SPACE, n_features=400, memory_size=MEMORY_SIZE,
+        n_actions=ACTION_SPACE, n_features=466, memory_size=MEMORY_SIZE,
         e_greedy_increment=0.001, double_q=False, sess=sess
     )
 
 with tf.variable_scope('Double_DQN'):
     double_DQN = DoubleDQN(
-        n_actions=ACTION_SPACE, n_features=400, memory_size=MEMORY_SIZE,
-        e_greedy_increment=0.001, double_q=True, sess=sess, output_graph=True)
+        n_actions=ACTION_SPACE, n_features=466, memory_size=MEMORY_SIZE, e_greedy=1.00,
+        e_greedy_increment=0.0001, reward_decay=0.97, double_q=False, sess=sess, output_graph=True)
 
 sess.run(tf.global_variables_initializer())
 
@@ -45,11 +45,11 @@ def train(RL):
         
         action = RL.choose_action(observation)
 
-        f_action = np.zeros(ACTION_SPACE)
-        f_action[action] = 1
+        # f_action = np.zeros(ACTION_SPACE)
+        # f_action[action] = 1
         # print(f_action)
         # f_action = (action-(ACTION_SPACE-1)/2)/((ACTION_SPACE-1)/4)   # convert to [-2 ~ 2] float actions
-        observation_, reward, done, info = env.nextFrame(f_action)
+        observation_, reward, done, info = env.nextFrame(action)
 
         reward /= 10     # normalize to a range of (-1, 0). r = 0 when get upright
         # the Q target at upright state will be 0, because Q_target = r + gamma * Qmax(s', a') = 0 + gamma * 0
@@ -60,17 +60,17 @@ def train(RL):
         if total_steps > MEMORY_SIZE:   # learning
             RL.learn()
 
-        if total_steps - MEMORY_SIZE > 20000:   # stop game
+        if total_steps - MEMORY_SIZE > 200000:   # stop game
             break
 
         observation = observation_
         total_steps += 1
     return RL.q
 
-q_natural = train(natural_DQN)
+# q_natural = train(natural_DQN)
 q_double = train(double_DQN)
 
-plt.plot(np.array(q_natural), c='r', label='natural')
+# plt.plot(np.array(q_natural), c='r', label='natural')
 plt.plot(np.array(q_double), c='b', label='double')
 plt.legend(loc='best')
 plt.ylabel('Q eval')
