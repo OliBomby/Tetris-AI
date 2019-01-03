@@ -15,7 +15,7 @@ WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
 BOXSIZE = 20
 BOARDWIDTH = 10
-BOARDHEIGHT = 40
+BOARDHEIGHT = 25
 NEXTPIECES = 6
 BLANK = '.'
 SOUND = False
@@ -26,8 +26,9 @@ MOVESIDEWAYSDELAY = 0.2 * FPS
 MOVEDOWNFREQ = 0.05 * FPS
 LOCKTIME = 0.5 * FPS
 
+HIDINGMARGIN = 102
 XMARGIN = int((WINDOWWIDTH - BOARDWIDTH * BOXSIZE) / 2)
-TOPMARGIN = WINDOWHEIGHT - (BOARDHEIGHT * BOXSIZE) - 5 + 400
+TOPMARGIN = WINDOWHEIGHT - (BOARDHEIGHT * BOXSIZE) - 5 + HIDINGMARGIN
 
 #               R    G    B
 WHITE = (255, 255, 255)
@@ -336,7 +337,7 @@ def getNewPiece(BAG):
     newPiece = {'shape': shape,
                 'rotation': 0,
                 'x': 3,
-                'y': 18,  # start it above the board (i.e. 18 because board is 40 high)
+                'y': BOARDHEIGHT - 22,  # start it above the board (i.e. 18 because board is 40 high)
                 'color': PIECES_COLORS[shape]}
     return newPiece
 
@@ -378,7 +379,7 @@ def isValidPosition(board, piece, adjX=0, adjY=0):
 def convertToPixelCoords(boxx, boxy):
     # Convert the given xy coordinates of the board to xy
     # coordinates of the location on the screen.
-    return (XMARGIN + (boxx * BOXSIZE)), (TOPMARGIN - 400 + (boxy * BOXSIZE))
+    return (XMARGIN + (boxx * BOXSIZE)), (TOPMARGIN - HIDINGMARGIN + (boxy * BOXSIZE))
 
 
 def drawBox(boxx, boxy, draw_color, DISPLAYSURF, pixelx=None, pixely=None, ghost=False):
@@ -509,9 +510,12 @@ class TetrisGame:
         self.lastSuccessfulMovement = None
         self.ghostPieceYOffset = 0
         self.score = 0
+        self.heuristic = 0
         self.lastScore = 0
+        self.lastheuristic = 0
         self.combo = 0
         self.lines = 0
+        self.linesCleared = 0
         self.moves = 0
         self.linesGoal = 5
         self.level = 1
@@ -521,6 +525,10 @@ class TetrisGame:
         self.fallingPiece = getNewPiece(self.BAG)
         self.nextPieces = [getNewPiece(self.BAG) for _ in range(NEXTPIECES)]
         self.holdPiece = None
+
+        self.num_features = BOARDHEIGHT * (BOARDWIDTH + 8)  # 8 columns for the pieces
+        self.featureShape = (BOARDHEIGHT, BOARDWIDTH + 8)
+        self.num_actions = 41  # 4 * 10 + 1 Rotations Columns Hold
 
     def reset(self):
         self.frame = 0
@@ -533,9 +541,12 @@ class TetrisGame:
         self.lastSuccessfulMovement = None
         self.ghostPieceYOffset = 0
         self.score = 0
+        self.heuristic = 0
         self.lastScore = 0
+        self.lastheuristic = 0
         self.combo = 0
         self.lines = 0
+        self.linesCleared = 0
         self.moves = 0
         self.linesGoal = 5
         self.level = 1
@@ -556,40 +567,41 @@ class TetrisGame:
 
         while True:  # game loop
             self.nextFrame(np.random.randint(0, 41))
+            pygame.time.wait(500)
 
     def getFeatures(self):
         # get board
-        board = np.zeros([BOARDWIDTH, BOARDHEIGHT])
+        board = np.zeros([BOARDHEIGHT, BOARDWIDTH])
         for x in range(BOARDWIDTH):
             for y in range(BOARDHEIGHT):
                 if self.board[x][y] != BLANK:
-                    board[x, y] = 1
+                    board[y, x] = 1
 
-        # add fallingpiece to board
-        for x in range(getWidth(self.fallingPiece)):
-            for y in range(getHeight(self.fallingPiece)):
-                if PIECES[self.fallingPiece['shape']][self.fallingPiece['rotation']][y][x] != BLANK:
-                    board[x + self.fallingPiece['x'], y + self.fallingPiece['y']] = 1
-
-        # append data about pieces
-        board = board.reshape(BOARDWIDTH * BOARDHEIGHT)
-
-        if self.fallingPiece is not None:
-            board = np.append(board, np.array(self.fallingPiece['x']))
-            board = np.append(board, np.array(self.fallingPiece['y']))
-            board = np.concatenate((board, PIECES_ONEHOT[self.fallingPiece['shape']]))
-        else:
-            board = np.concatenate((board, PIECES_ONEHOT['None']))
+        # Concatenate all the pieces info together
+        # (holdpiece, falingpiece, nextpieces)
+        pieces = []
 
         if self.holdPiece is not None:
-            board = np.concatenate((board, PIECES_ONEHOT[self.holdPiece['shape']]))
+            pieces.append(PIECES_ONEHOT[self.holdPiece['shape']])
         else:
-            board = np.concatenate((board, PIECES_ONEHOT['None']))
+            pieces.append(PIECES_ONEHOT['None'])
+
+        if self.fallingPiece is not None:
+            pieces.append(PIECES_ONEHOT[self.fallingPiece['shape']])
+        else:
+            pieces.append(PIECES_ONEHOT['None'])
 
         for piece in self.nextPieces:
-            board = np.concatenate((board, PIECES_ONEHOT[piece['shape']]))
+            pieces.append(PIECES_ONEHOT[piece['shape']])
 
-        return board
+        # Add zeros to have the height match with the board
+        pieces = np.vstack(pieces)
+        zeros = np.zeros((BOARDHEIGHT - len(self.nextPieces) - 2, 8))
+        pieces = np.concatenate((pieces, zeros), axis=0)
+
+        board = np.concatenate((board, pieces), axis=1)
+
+        return board.reshape(self.num_features)
 
     def nextFrame(self, action=0):
         if action < 40:
@@ -625,15 +637,16 @@ class TetrisGame:
             self.lastFallTime = self.frame
             self.lockTime -= 1
             if self.lockTime < 0:
-                if self.fallingPiece['y'] < 19:
+                if self.fallingPiece['y'] < BOARDHEIGHT - 21:
                     self.gameOver()  # lock out: a piece locked in above the screen
-                    return self.getFeatures(), -1000, False, ""
+                    return self.getFeatures(), -100, False, ""
 
                 # check for T-spin
                 tspin = checkForTSpin(self.fallingPiece, self.board, self.lastSuccessfulMovement)
 
                 addToBoard(self.board, self.fallingPiece)
                 linesCleared = self.removeCompleteLines(self.board)
+                self.linesCleared += linesCleared
 
                 # line values for variable-goal levels
                 if linesCleared == 0:
@@ -677,7 +690,7 @@ class TetrisGame:
 
                 if not isValidPosition(self.board, self.fallingPiece):
                     self.gameOver()  # can't fit a new piece on the board, so game over
-                    return self.getFeatures(), -1000, False, ""
+                    return self.getFeatures(), -100, False, ""
 
         # let the piece fall if it is time to fall
         if self.frame - self.lastFallTime > self.fallFreq:
@@ -694,16 +707,19 @@ class TetrisGame:
                     self.ghostPieceYOffset = i - 1
                     break
 
+        self.heuristic = self.getHeuristicScore(self.linesCleared)
         scoreChange = self.score - self.lastScore
+        heuristicChange = self.heuristic - self.lastheuristic
         self.lastScore = self.score
+        self.lastheuristic = self.heuristic
 
         # drawing everything on the screen
         self.DISPLAYSURF.fill(BGCOLOR)
-        drawStatus(self.score, self.level, self.DISPLAYSURF)
+        drawStatus(np.round(self.heuristic, 1), self.level, self.DISPLAYSURF)
         drawNextPieces(self.nextPieces, self.DISPLAYSURF)
         drawHoldPiece(self.holdPiece, self.DISPLAYSURF)
         if self.fallingPiece is not None:
-            drawGhostPiece(self.fallingPiece, self.ghostPieceYOffset, self.DISPLAYSURF)
+            # drawGhostPiece(self.fallingPiece, self.ghostPieceYOffset, self.DISPLAYSURF)
             drawPiece(self.fallingPiece, self.DISPLAYSURF)
         drawBoard(self.board, self.DISPLAYSURF)
         drawBoxToObscurePiece(self.DISPLAYSURF)
@@ -712,7 +728,36 @@ class TetrisGame:
         pygame.event.pump()
         pygame.display.update()
 
-        return self.getFeatures(), scoreChange, False, ""
+        return self.getFeatures(), heuristicChange, False, ""
+
+    def getHeuristicScore(self, lines):
+        height, holes, bumpiness = self.getHeuristicBoard(self.board)
+        return -0.51 * height + 0.76 * lines - 0.36 * holes - 0.18 * bumpiness
+
+    def getHeuristicBoard(self, board):
+        heights = []
+        holes = 0
+        for x in range(BOARDWIDTH):
+            lowest = 0
+            for y in range(BOARDHEIGHT):  # Get the highest
+                lowest = y
+                if board[x][y] != BLANK:
+                    break
+            heights.append(BOARDHEIGHT - lowest)
+
+            roof = False
+            for y in range(BOARDHEIGHT):  # Get the holes
+                if board[x][y] == BLANK:
+                    if roof:
+                        holes += 1
+                else:
+                    roof = True
+
+        bumps = [abs(j - i) for i, j in zip(heights[:-1], heights[1:])]
+
+        height = sum(heights)
+        bumpiness = sum(bumps)
+        return height, holes, bumpiness
 
     def calculateLevelAndFallFreq(self):
         # Based on the score, return the level the player is on and
@@ -771,7 +816,7 @@ class TetrisGame:
 
             self.holdPiece['rotation'] = 0
             self.holdPiece['x'] = 3
-            self.holdPiece['y'] = 18
+            self.holdPiece['y'] = BOARDHEIGHT - 22
             self.canUseHold = False
 
     def moveLeft(self):
