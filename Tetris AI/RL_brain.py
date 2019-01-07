@@ -236,22 +236,25 @@ class DeepQNetwork:
 
     def choose_action(self, observation):
         # to have batch dimension when feed into tf placeholder
-        observation = observation[np.newaxis, :]
 
         if np.random.uniform() < self.epsilon:
             # forward feed the observation and get q value for every actions
-            actions_value = self.sess.run(self.q_eval, feed_dict={self.s: observation, self.keep_prob: 0.75})
+            actions_value = self.get_reading(observation, kp=1)
             action = np.argmax(actions_value)
         else:
             action = np.random.randint(0, self.n_actions)
         return action
+
+    def get_reading(self, observation, kp=0.75):
+        observation = observation[np.newaxis, :]
+        return self.sess.run(self.q_eval, feed_dict={self.s: observation, self.keep_prob: kp})
 
     def learn(self):
         # check to replace target parameters
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.sess.run(self.replace_target_op)
             print('target_params_replaced')
-            print(self.epsilon)
+            print("Epsilon: %s" % self.epsilon)
 
         # sample batch memory from all memory
         if self.memory_counter > self.memory_size:
@@ -277,38 +280,12 @@ class DeepQNetwork:
 
         q_target[batch_index, eval_act_index] = reward + self.gamma * np.max(q_next, axis=1)
 
-        """
-        For example in this batch I have 2 samples and 3 actions:
-        q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        q_target = q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        Then change q_target with the real q_target value w.r.t the q_eval's action.
-        For example in:
-            sample 0, I took action 0, and the max q_target value is -1;
-            sample 1, I took action 2, and the max q_target value is -2:
-        q_target =
-        [[-1, 2, 3],
-         [4, 5, -2]]
-
-        So the (q_target - q_eval) becomes:
-        [[(-1)-(1), 0, 0],
-         [0, 0, (-2)-(6)]]
-
-        We then backpropagate this error w.r.t the corresponding action to network,
-        leave other action as error=0 cause we didn't choose it.
-        """
-
         # train eval network
         _, self.cost = self.sess.run([self._train_op, self.loss],
                                      feed_dict={self.s: batch_memory[:, :self.n_features],
                                                 self.q_target: q_target,
                                                 self.keep_prob: 0.75})
-        self.cost_his.append(self.cost)
+        # self.cost_his.append(self.cost)
 
         # increasing epsilon
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max

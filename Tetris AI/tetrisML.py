@@ -255,6 +255,7 @@ class Bag:
 
     def newBag(self):
         self.bag = [n for n in range(0, len(PIECES.keys()))]
+        # self.bag = [0 for n in range(0, len(PIECES.keys()))]
         random.shuffle(self.bag)
 
     def getPiece(self):
@@ -484,7 +485,7 @@ def drawHoldPiece(piece, DISPLAYSURF):
 
 
 class TetrisGame:
-    def __init__(self):
+    def __init__(self, log=False):
         self.DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self.BAG = Bag()
         self.FPSCLOCK = pygame.time.Clock()
@@ -530,7 +531,16 @@ class TetrisGame:
         self.featureShape = (BOARDHEIGHT, BOARDWIDTH + 8)
         self.num_actions = 41  # 4 * 10 + 1 Rotations Columns Hold
 
+        # Stats
+        self.log = log
+        self.scores = []
+        self.gamelengths = []
+
     def reset(self):
+        if self.log:
+            self.scores.append(self.score)
+            self.gamelengths.append(self.frame)
+
         self.frame = 0
         self.board = getBlankBoard()
         self.BAG.newBag()
@@ -639,7 +649,7 @@ class TetrisGame:
             if self.lockTime < 0:
                 if self.fallingPiece['y'] < BOARDHEIGHT - 21:
                     self.gameOver()  # lock out: a piece locked in above the screen
-                    return self.getFeatures(), -100, False, ""
+                    return self.getFeatures(), -100
 
                 # check for T-spin
                 tspin = checkForTSpin(self.fallingPiece, self.board, self.lastSuccessfulMovement)
@@ -690,7 +700,7 @@ class TetrisGame:
 
                 if not isValidPosition(self.board, self.fallingPiece):
                     self.gameOver()  # can't fit a new piece on the board, so game over
-                    return self.getFeatures(), -100, False, ""
+                    return self.getFeatures(), -100
 
         # let the piece fall if it is time to fall
         if self.frame - self.lastFallTime > self.fallFreq:
@@ -710,6 +720,8 @@ class TetrisGame:
         self.heuristic = self.getHeuristicScore(self.linesCleared)
         scoreChange = self.score - self.lastScore
         heuristicChange = self.heuristic - self.lastheuristic
+        if action == 40:  # punishment for spamming hold
+            heuristicChange = -8
         self.lastScore = self.score
         self.lastheuristic = self.heuristic
 
@@ -728,7 +740,7 @@ class TetrisGame:
         pygame.event.pump()
         pygame.display.update()
 
-        return self.getFeatures(), heuristicChange, False, ""
+        return self.getFeatures(), heuristicChange
 
     def getHeuristicScore(self, lines):
         height, holes, bumpiness = self.getHeuristicBoard(self.board)

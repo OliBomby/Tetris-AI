@@ -25,6 +25,8 @@
 *.log
 *.sqlite
 logs
+*.ckpt*
+checkpoint
 
 # OS generated files #
 ######################
