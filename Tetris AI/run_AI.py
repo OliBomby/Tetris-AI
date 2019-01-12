@@ -86,7 +86,7 @@ for test in tests:
     with tf.variable_scope('Double_DQN'):
         DQN = DeepQNetwork(
             n_actions=ACTION_SPACE, n_features=FEATURES, memory_size=MEMORY_SIZE,
-            e_greedy_increment=0.0000009, e_greedy=0.9, reward_decay=0.75, output_graph=False,
+            e_greedy_increment=0.0000045, e_greedy=0.9, reward_decay=0.75, output_graph=False,
             feature_shape=FEATURESHAPE,
             state_shape=STATESHAPE, learning_rate=2E-6)
 
