@@ -57,15 +57,29 @@ def testAgent(RL, test, frames=2000):
         test_env.heuristicChanges)
 
 
+def testRandom(test, frames=2000):
+    test_env = tetrisML.TetrisGame("Testing " + test[0], test[1], test[2], test[3], log=True)
+    total_steps = 0
+    observation = test_env.reset()
+    while True:
+        action = np.random.randint(0, 41)
+
+        observation_, reward = test_env.nextFrame(action)
+
+        if total_steps > frames:  # stop game
+            break
+
+        observation = observation_
+        total_steps += 1
+
+    return np.average(test_env.scores), np.average(test_env.gamelengths), np.average(test_env.scoreChanges), np.average(
+        test_env.heuristicChanges)
+
+
 tests = [
     ["Controle", True, True, 6],
     ["Onzichtbaar veld", False, True, 6],
     ["Onzichtbare hold", True, False, 6],
-    ["Een next piece zichtbaar", True, True, 1],
-    ["Geen next piece zichtbaar", True, True, 0]
-]
-
-tests = [
     ["Een next piece zichtbaar", True, True, 1],
     ["Geen next piece zichtbaar", True, True, 0]
 ]

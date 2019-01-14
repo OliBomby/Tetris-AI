@@ -279,7 +279,7 @@ class Bag:
         self.nextpiece = self.getPieceOld()
 
     def newBag(self):
-        self.bag = [n for n in range(1, len(PIECES.keys()))]
+        self.bag = [n for n in range(1, len(SHAPES))]
         # self.bag = [0 for n in range(0, len(PIECES.keys()))]
         random.shuffle(self.bag)
 
@@ -1094,7 +1094,7 @@ class TetrisGame:
         scoreChange = self.score - self.lastScore
         heuristicChange = self.heuristic - self.lastheuristic
         if action == 40:  # punishment for spamming hold
-            heuristicChange = -8
+            heuristicChange = -3
         self.lastScore = self.score
         self.lastheuristic = self.heuristic
 

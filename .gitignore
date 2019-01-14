@@ -27,6 +27,7 @@
 logs
 *.ckpt*
 checkpoint
+Results.txt
 
 # OS generated files #
 ######################
